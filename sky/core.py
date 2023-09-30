@@ -449,9 +449,9 @@ def autostop(
             f'{operation} cluster {cluster_name!r} with TPU VM Pod '
             'is not supported.')
 
-    # Check autostop is implemented for cloud
-    cloud = handle.launched_resources.cloud
     if not down and idle_minutes >= 0:
+        # Check autostop is implemented for cloud
+        cloud = handle.launched_resources.cloud
         cloud.check_features_are_supported(
             {clouds.CloudImplementationFeatures.AUTOSTOP})
 
@@ -519,8 +519,7 @@ def queue(cluster_name: str,
         raise RuntimeError(f'{jobs_payload + stderr}\n{colorama.Fore.RED}'
                            f'Failed to get job queue on cluster {cluster_name}.'
                            f'{colorama.Style.RESET_ALL}')
-    jobs = job_lib.load_job_queue(jobs_payload)
-    return jobs
+    return job_lib.load_job_queue(jobs_payload)
 
 
 @usage_lib.entrypoint
@@ -688,8 +687,7 @@ def download_logs(
     sky_logging.print(f'{colorama.Fore.YELLOW}'
                       'Syncing down logs to local...'
                       f'{colorama.Style.RESET_ALL}')
-    local_log_dirs = backend.sync_down_logs(handle, job_ids, local_dir)
-    return local_log_dirs
+    return backend.sync_down_logs(handle, job_ids, local_dir)
 
 
 @usage_lib.entrypoint
@@ -738,8 +736,7 @@ def job_status(cluster_name: str,
                       f'{colorama.Style.RESET_ALL}')
 
     usage_lib.record_cluster_name_for_current_operation(cluster_name)
-    statuses = backend.get_job_status(handle, job_ids, stream_logs=stream_logs)
-    return statuses
+    return backend.get_job_status(handle, job_ids, stream_logs=stream_logs)
 
 
 # =======================
@@ -974,8 +971,7 @@ def storage_delete(name: str) -> None:
     handle = global_user_state.get_handle_from_storage_name(name)
     if handle is None:
         raise ValueError(f'Storage name {name!r} not found.')
-    else:
-        store_object = data.Storage(name=handle.storage_name,
-                                    source=handle.source,
-                                    sync_on_reconstruction=False)
-        store_object.delete()
+    store_object = data.Storage(name=handle.storage_name,
+                                source=handle.source,
+                                sync_on_reconstruction=False)
+    store_object.delete()

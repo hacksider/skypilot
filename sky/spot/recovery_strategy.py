@@ -225,9 +225,9 @@ class StrategyExecutor:
             # Check the job status until it is not in initialized status
             if status is not None and status > job_lib.JobStatus.INIT:
                 try:
-                    job_submitted_at = spot_utils.get_job_timestamp(
-                        self.backend, self.cluster_name, get_end_time=False)
-                    return job_submitted_at
+                    return spot_utils.get_job_timestamp(
+                        self.backend, self.cluster_name, get_end_time=False
+                    )
                 except Exception as e:  # pylint: disable=broad-except
                     # If we failed to get the job timestamp, we will retry
                     # job checking loop.
@@ -349,14 +349,12 @@ class StrategyExecutor:
 
             terminate_cluster(self.cluster_name)
             if max_retry is not None and retry_cnt >= max_retry:
-                # Retry forever if max_retry is None.
-                if raise_on_failure:
-                    with ux_utils.print_exception_no_traceback():
-                        raise exceptions.SpotJobReachedMaxRetriesError(
-                            'Resources unavailable: failed to launch the spot '
-                            f'cluster after {max_retry} retries.')
-                else:
+                if not raise_on_failure:
                     return None
+                with ux_utils.print_exception_no_traceback():
+                    raise exceptions.SpotJobReachedMaxRetriesError(
+                        'Resources unavailable: failed to launch the spot '
+                        f'cluster after {max_retry} retries.')
             gap_seconds = backoff.current_backoff()
             logger.info('Retrying to launch the spot cluster in '
                         f'{gap_seconds:.1f} seconds.')

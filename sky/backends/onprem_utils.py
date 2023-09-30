@@ -343,7 +343,7 @@ def launch_ray_on_local_cluster(cluster_config: Dict[str, Dict[str, Any]],
     ip_list = [socket.gethostbyname(ip) for ip in ip_list]
     cluster_config['cluster']['ips'] = ip_list
     auth_config = cluster_config['auth']
-    assert len(ip_list) >= 1, 'Must specify at least one Local IP'
+    assert ip_list, 'Must specify at least one Local IP'
 
     head_ip = ip_list[0]
     worker_ips = ip_list[1:]

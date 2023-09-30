@@ -162,8 +162,8 @@ def main():
         default_root_dir=argv.root_dir,
     )
 
-    model_ckpts = glob.glob(argv.root_dir + "/*.ckpt")
-    if argv.resume and len(model_ckpts) > 0:
+    model_ckpts = glob.glob(f"{argv.root_dir}/*.ckpt")
+    if argv.resume and model_ckpts:
         latest_ckpt = max(model_ckpts, key=os.path.getctime)
         trainer.fit(model, cifar10_dm, ckpt_path=latest_ckpt)
     else:

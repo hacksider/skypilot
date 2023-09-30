@@ -210,8 +210,7 @@ def get_ibm_cos_bucket_region(bucket_name: str) -> str:
             futures.append(future)
 
         for future in concurrent.futures.as_completed(futures):
-            region = future.result()
-            if region:
+            if region := future.result():
                 logger.debug(f'bucket {bucket_name} was found in {region}')
                 return region
     return ''
@@ -291,10 +290,7 @@ def parallel_upload(source_path_list: List[str],
         commands.append(sync_command)
     # Generate dir upload commands
     for dir_path in dirs:
-        if create_dirs:
-            dest_dir_name = os.path.basename(dir_path)
-        else:
-            dest_dir_name = ''
+        dest_dir_name = os.path.basename(dir_path) if create_dirs else ''
         sync_command = dirsync_command_generator(dir_path, dest_dir_name)
         commands.append(sync_command)
 
@@ -472,7 +468,7 @@ class Rclone():
 
         # write back file without profile: [bucket_name]
         # to which the new bucket profile is appended
-        with FileLock(rclone_config_path + '.lock'):
+        with FileLock(f'{rclone_config_path}.lock'):
             profiles_to_keep = Rclone._remove_bucket_profile_rclone(
                 bucket_name, cloud)
             with open(f'{rclone_config_path}', 'w') as file:
@@ -521,7 +517,7 @@ class Rclone():
                 f'trying to delete rclone profile: {bucket_rclone_profile}')
             return
 
-        with FileLock(rclone_config_path + '.lock'):
+        with FileLock(f'{rclone_config_path}.lock'):
             profiles_to_keep = Rclone._remove_bucket_profile_rclone(
                 bucket_name, cloud)
 

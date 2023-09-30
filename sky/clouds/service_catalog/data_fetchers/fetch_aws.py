@@ -82,16 +82,15 @@ def get_enabled_regions() -> Set[str]:
         try:
             user_cloud_regions = aws_client.describe_regions()['Regions']
         except aws.botocore_exceptions().ClientError as e:
-            if e.response['Error']['Code'] == 'UnauthorizedOperation':
-                with ux_utils.print_exception_no_traceback():
-                    raise RuntimeError(
-                        'Failed to retrieve AWS regions. '
-                        'Please ensure that the `ec2:DescribeRegions` action '
-                        'is enabled for your AWS account in IAM. '
-                        'Ref: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeRegions.html'  # pylint: disable=line-too-long
-                    ) from None
-            else:
+            if e.response['Error']['Code'] != 'UnauthorizedOperation':
                 raise
+            with ux_utils.print_exception_no_traceback():
+                raise RuntimeError(
+                    'Failed to retrieve AWS regions. '
+                    'Please ensure that the `ec2:DescribeRegions` action '
+                    'is enabled for your AWS account in IAM. '
+                    'Ref: https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeRegions.html'  # pylint: disable=line-too-long
+                ) from None
         regions_enabled = {r['RegionName'] for r in user_cloud_regions}
         regions_enabled = regions_enabled.intersection(set(ALL_REGIONS))
     return regions_enabled
@@ -123,7 +122,6 @@ def _get_instance_type_offerings(region: str) -> pd.DataFrame:
 
 def _get_availability_zones(region: str) -> pd.DataFrame:
     client = aws.client('ec2', region_name=region)
-    zones = []
     try:
         response = client.describe_availability_zones()
     except aws.botocore_exceptions().ClientError as e:
@@ -147,11 +145,13 @@ def _get_availability_zones(region: str) -> pd.DataFrame:
                     AZ_PERMISSION_DENIED) from None
         else:
             raise
-    for resp in response['AvailabilityZones']:
-        zones.append({
+    zones = [
+        {
             'AvailabilityZoneName': resp['ZoneName'],
             'AvailabilityZone': resp['ZoneId'],
-        })
+        }
+        for resp in response['AvailabilityZones']
+    ]
     return pd.DataFrame(zones)
 
 
@@ -204,29 +204,27 @@ def _get_spot_pricing_table(region: str) -> pd.DataFrame:
 
 def _patch_p4de(region: str, df: pd.DataFrame,
                 pricing_df: pd.DataFrame) -> pd.DataFrame:
-    # Hardcoded patch for p4de.24xlarge, as our credentials doesn't have access
-    # to the instance type.
-    # Columns:
-    # InstanceType,AcceleratorName,AcceleratorCount,vCPUs,MemoryGiB,GpuInfo,
-    # Price,SpotPrice,Region,AvailabilityZone
-    records = []
-    for zone in df[df['Region'] == region]['AvailabilityZone'].unique():
-        records.append({
+    records = [
+        {
             'InstanceType': 'p4de.24xlarge',
             'AcceleratorName': 'A100-80GB',
             'AcceleratorCount': 8,
             'vCPUs': 96,
             'MemoryGiB': 1152,
-            'GpuInfo':
-                ('{\'Gpus\': [{\'Name\': \'A100-80GB\', \'Manufacturer\': '
-                 '\'NVIDIA\', \'Count\': 8, \'MemoryInfo\': {\'SizeInMiB\': '
-                 '81920}}], \'TotalGpuMemoryInMiB\': 655360}'),
+            'GpuInfo': (
+                '{\'Gpus\': [{\'Name\': \'A100-80GB\', \'Manufacturer\': '
+                '\'NVIDIA\', \'Count\': 8, \'MemoryInfo\': {\'SizeInMiB\': '
+                '81920}}], \'TotalGpuMemoryInMiB\': 655360}'
+            ),
             'AvailabilityZone': zone,
             'Region': region,
-            'Price': pricing_df[pricing_df['InstanceType'] == 'p4de.24xlarge']
-                     ['Price'].values[0],
+            'Price': pricing_df[pricing_df['InstanceType'] == 'p4de.24xlarge'][
+                'Price'
+            ].values[0],
             'SpotPrice': np.nan,
-        })
+        }
+        for zone in df[df['Region'] == region]['AvailabilityZone'].unique()
+    ]
     df = pd.concat([df, pd.DataFrame.from_records(records)])
     return df
 

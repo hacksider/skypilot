@@ -1,4 +1,5 @@
 """Util constants/functions for the backends."""
+
 from datetime import datetime
 import difflib
 import enum
@@ -86,7 +87,8 @@ _LAUNCHED_RESERVED_WORKER_PATTERN = re.compile(
 # bug with python=3.6.
 # 10.133.0.5: ray.worker.default,
 _LAUNCHING_IP_PATTERN = re.compile(
-    r'({}): ray[._]worker[._](?:default|reserved)'.format(IP_ADDR_REGEX))
+    f'({IP_ADDR_REGEX}): ray[._]worker[._](?:default|reserved)'
+)
 WAIT_HEAD_NODE_IP_MAX_ATTEMPTS = 3
 
 # We check network connection by going through _TEST_IP_LIST. We may need to
@@ -175,8 +177,7 @@ def fill_template(template_name: str, variables: Dict,
     template_path = os.path.join(sky.__root_dir__, 'templates', template_name)
     if not os.path.exists(template_path):
         raise FileNotFoundError(f'Template "{template_name}" does not exist.')
-    with open(template_path) as fin:
-        template = fin.read()
+    template = pathlib.Path(template_path).read_text()
     output_path = os.path.abspath(os.path.expanduser(output_path))
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
@@ -216,11 +217,9 @@ def _optimize_file_mounts(yaml_path: str) -> None:
     local_runtime_files_dir = tempfile.mkdtemp()
     new_file_mounts = {_REMOTE_RUNTIME_FILES_DIR: local_runtime_files_dir}
 
-    # Generate local_src -> unique_name.
-    local_source_to_unique_name = {}
-    for local_src in file_mounts.values():
-        local_source_to_unique_name[local_src] = str(uuid.uuid4())
-
+    local_source_to_unique_name = {
+        local_src: str(uuid.uuid4()) for local_src in file_mounts.values()
+    }
     # (For remote) Build a command that copies runtime files to their right
     # destinations.
     # NOTE: we copy rather than move, because when launching >1 node, head node
@@ -319,7 +318,6 @@ def path_size_megabytes(path: str) -> int:
         except ValueError:
             logger.debug('Failed to find "total size" in rsync output. Inspect '
                          f'output of the following command: {rsync_command}')
-            pass  # Maybe different rsync versions have different output.
     return -1
 
 
@@ -474,19 +472,14 @@ class SSHConfigHelper(object):
             ports: List of port numbers for SSH corresponding to ips
             docker_user: If not None, use this user to ssh into the docker
         """
-        username = auth_config['ssh_user']
-        if docker_user is not None:
-            username = docker_user
+        username = docker_user if docker_user is not None else auth_config['ssh_user']
         key_path = os.path.expanduser(auth_config['ssh_private_key'])
         host_name = cluster_name
         sky_autogen_comment = ('# Added by sky (use `sky stop/down '
                                f'{cluster_name}` to remove)')
         overwrite = False
         overwrite_begin_idx = None
-        ip = ips[0]
-        if docker_user is not None:
-            ip = 'localhost'
-
+        ip = 'localhost' if docker_user is not None else ips[0]
         config_path = os.path.expanduser(cls.ssh_conf_path)
         if os.path.exists(config_path):
             with open(config_path) as f:
@@ -495,7 +488,7 @@ class SSHConfigHelper(object):
             # If an existing config with `cluster_name` exists, raise a warning.
             for i, line in enumerate(config):
                 if line.strip() == f'Host {cluster_name}':
-                    prev_line = config[i - 1] if i - 1 >= 0 else ''
+                    prev_line = config[i - 1] if i >= 1 else ''
                     if prev_line.strip().startswith(sky_autogen_comment):
                         overwrite = True
                         overwrite_begin_idx = i - 1
@@ -503,10 +496,9 @@ class SSHConfigHelper(object):
                         logger.warning(f'{cls.ssh_conf_path} contains '
                                        f'host named {cluster_name}.')
                         host_name = ip
-                        logger.warning(f'Using {ip} to identify host instead.')
-
+                        logger.warning(f'Using {host_name} to identify host instead.')
                 if line.strip() == f'Host {ip}':
-                    prev_line = config[i - 1] if i - 1 >= 0 else ''
+                    prev_line = config[i - 1] if i >= 1 else ''
                     if prev_line.strip().startswith(sky_autogen_comment):
                         overwrite = True
                         overwrite_begin_idx = i - 1
@@ -561,9 +553,7 @@ class SSHConfigHelper(object):
         auth_config: Dict[str, str],
         docker_user: Optional[str] = None,
     ):
-        username = auth_config['ssh_user']
-        if docker_user is not None:
-            username = docker_user
+        username = docker_user if docker_user is not None else auth_config['ssh_user']
         key_path = os.path.expanduser(auth_config['ssh_private_key'])
         host_name = cluster_name
         sky_autogen_comment = ('# Added by sky (use `sky stop/down '
@@ -572,20 +562,17 @@ class SSHConfigHelper(object):
         # Ensure stableness of the aliases worker-<i> by sorting based on
         # public IPs.
         external_worker_ips = list(sorted(external_worker_ips))
-        port = 22
-        if docker_user is not None:
-            port = constants.DEFAULT_DOCKER_PORT
-
+        port = constants.DEFAULT_DOCKER_PORT if docker_user is not None else 22
         overwrites = [False] * len(external_worker_ips)
         overwrite_begin_idxs: List[Optional[int]] = [None
                                                     ] * len(external_worker_ips)
         codegens: List[Optional[str]] = [None] * len(external_worker_ips)
-        worker_names = []
         extra_path_name = cls.ssh_multinode_path.format(cluster_name)
 
-        for idx in range(len(external_worker_ips)):
-            worker_names.append(cluster_name + f'-worker{idx+1}')
-
+        worker_names = [
+            f'{cluster_name}-worker{idx + 1}'
+            for idx in range(len(external_worker_ips))
+        ]
         config_path = os.path.expanduser(cls.ssh_conf_path)
         with open(config_path) as f:
             config = f.readlines()

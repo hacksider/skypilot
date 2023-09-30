@@ -37,9 +37,7 @@ class SkyLightningCallback(pl.Callback):
             return self._total_steps
 
         total_steps = trainer.estimated_stepping_batches
-        if total_steps == float('inf') or total_steps < 0:
-            return None
-        return total_steps
+        return None if total_steps == float('inf') or total_steps < 0 else total_steps
 
     def on_train_start(self, trainer: pl.Trainer,
                        pl_module: pl.LightningModule) -> None:

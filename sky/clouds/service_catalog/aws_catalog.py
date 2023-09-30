@@ -74,15 +74,14 @@ def _get_az_mappings(aws_user_hash: str) -> Optional[pd.DataFrame]:
         f'aws/az_mappings-{aws_user_hash}.csv')
     if not os.path.exists(az_mapping_path):
         az_mappings = None
-        if aws_user_hash != 'default':
-            # Fetch az mapping from AWS.
-            print(
-                f'\r{colorama.Style.DIM}AWS: Fetching availability zones '
-                f'mapping...{colorama.Style.RESET_ALL}',
-                end='')
-            az_mappings = fetch_aws.fetch_availability_zone_mappings()
-        else:
+        if aws_user_hash == 'default':
             return None
+        # Fetch az mapping from AWS.
+        print(
+            f'\r{colorama.Style.DIM}AWS: Fetching availability zones '
+            f'mapping...{colorama.Style.RESET_ALL}',
+            end='')
+        az_mappings = fetch_aws.fetch_availability_zone_mappings()
         az_mappings.to_csv(az_mapping_path, index=False)
     else:
         az_mappings = pd.read_csv(az_mapping_path)
@@ -117,13 +116,7 @@ def _fetch_and_apply_az_mapping(df: pd.DataFrame) -> pd.DataFrame:
         aws_user_hash = hashlib.md5(user_identity.encode()).hexdigest()[:8]
     except exceptions.CloudUserIdentityError:
         glob_name = common.get_catalog_path('aws/az_mappings-*.csv')
-        # Find the most recent file that matches the glob.
-        # We check the existing files because the user could remove the
-        # credentials after a cluster is created. Using the latest mapping
-        # file is better than using the default mapping file because the
-        # former is more likely to be correct.
-        glob_files = glob.glob(glob_name)
-        if glob_files:
+        if glob_files := glob.glob(glob_name):
             glob_files.sort(key=os.path.getmtime)
             aws_user_hash = os.path.basename(glob_files[-1]).split('-')[1]
             # aws_user_hash can be set to `default` if the user never
@@ -174,15 +167,11 @@ def get_quota_code(instance_type: str, use_spot: bool) -> Optional[str]:
     to check its quota.
     """
 
-    if use_spot:
-        spot_header = 'SpotInstanceCode'
-    else:
-        spot_header = 'OnDemandInstanceCode'
+    spot_header = 'SpotInstanceCode' if use_spot else 'OnDemandInstanceCode'
     try:
-        quota_code = _quotas_df.loc[_quotas_df['InstanceType'] == instance_type,
-                                    spot_header].values[0]
-        return quota_code
-
+        return _quotas_df.loc[
+            _quotas_df['InstanceType'] == instance_type, spot_header
+        ].values[0]
     except IndexError:
         return None
 

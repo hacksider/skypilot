@@ -74,9 +74,7 @@ class InstanceInfo:
     def get_feasible_ip(self) -> str:
         """Get the most feasible IPs of the instance. This function returns
         the public IP if it exist, otherwise it returns a private IP."""
-        if self.external_ip is not None:
-            return self.external_ip
-        return self.internal_ip
+        return self.external_ip if self.external_ip is not None else self.internal_ip
 
 
 @dataclasses.dataclass
@@ -107,9 +105,7 @@ class ClusterInfo:
     def has_external_ips(self) -> bool:
         """True if the cluster has external IP."""
         ip_tuples = self.ip_tuples()
-        if not ip_tuples:
-            return False
-        return ip_tuples[0][1] is not None
+        return False if not ip_tuples else ip_tuples[0][1] is not None
 
     def _get_ips(self, use_internal_ips: bool) -> List[str]:
         """Get public or private/internal IPs of all instances.
@@ -118,14 +114,13 @@ class ClusterInfo:
         """
         ip_tuples = self.ip_tuples()
         ip_list = []
-        if use_internal_ips:
-            for pair in ip_tuples:
+        for pair in ip_tuples:
+            if use_internal_ips:
                 internal_ip = pair[0]
                 if internal_ip is None:
                     raise ValueError('Not all instances have private IPs')
                 ip_list.append(internal_ip)
-        else:
-            for pair in ip_tuples:
+            else:
                 public_ip = pair[1]
                 if public_ip is None:
                     raise ValueError('Not all instances have public IPs')

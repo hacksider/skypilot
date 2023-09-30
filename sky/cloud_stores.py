@@ -56,9 +56,7 @@ class S3CloudStorage(CloudStorage):
         bucket_name, path = data_utils.split_s3_path(url)
         bucket = s3.Bucket(bucket_name)
 
-        num_objects = 0
-        for obj in bucket.objects.filter(Prefix=path):
-            num_objects += 1
+        for num_objects, obj in enumerate(bucket.objects.filter(Prefix=path), start=1):
             if obj.key == path:
                 return False
             # If there are more than 1 object in filter, then it is a directory
@@ -110,8 +108,7 @@ class GcsCloudStorage(CloudStorage):
         In cloud object stores, a "directory" refers to a regular object whose
         name is a prefix of other objects.
         """
-        commands = [self._INSTALL_GSUTIL]
-        commands.append(f'{self._gsutil_command} ls -d {url}')
+        commands = [self._INSTALL_GSUTIL, f'{self._gsutil_command} ls -d {url}']
         command = ' && '.join(commands)
         p = subprocess.run(command,
                            stdout=subprocess.PIPE,
@@ -132,7 +129,7 @@ class GcsCloudStorage(CloudStorage):
         if not out.endswith('/'):
             assert out == url.rstrip('/'), (out, url)
             return False
-        url = url if url.endswith('/') else (url + '/')
+        url = url if url.endswith('/') else f'{url}/'
         assert out == url, (out, url)
         return True
 
@@ -140,16 +137,14 @@ class GcsCloudStorage(CloudStorage):
         """Downloads a directory using gsutil."""
         download_via_gsutil = (f'{self._gsutil_command} '
                                f'rsync -e -r {source} {destination}')
-        all_commands = [self._INSTALL_GSUTIL]
-        all_commands.append(download_via_gsutil)
+        all_commands = [self._INSTALL_GSUTIL, download_via_gsutil]
         return ' && '.join(all_commands)
 
     def make_sync_file_command(self, source: str, destination: str) -> str:
         """Downloads a file using gsutil."""
         download_via_gsutil = f'{self._gsutil_command} ' \
-                              f'cp {source} {destination}'
-        all_commands = [self._INSTALL_GSUTIL]
-        all_commands.append(download_via_gsutil)
+                                  f'cp {source} {destination}'
+        all_commands = [self._INSTALL_GSUTIL, download_via_gsutil]
         return ' && '.join(all_commands)
 
 
@@ -171,9 +166,7 @@ class R2CloudStorage(CloudStorage):
         bucket_name, path = data_utils.split_r2_path(url)
         bucket = r2.Bucket(bucket_name)
 
-        num_objects = 0
-        for obj in bucket.objects.filter(Prefix=path):
-            num_objects += 1
+        for num_objects, obj in enumerate(bucket.objects.filter(Prefix=path), start=1):
             if obj.key == path:
                 return False
             # If there are more than 1 object in filter, then it is a directory
@@ -247,9 +240,7 @@ class IBMCosCloudStorage(CloudStorage):
         s3 = ibm.get_cos_resource(region)
         bucket = s3.Bucket(bucket_name)
 
-        num_objects = 0
-        for obj in bucket.objects.filter(Prefix=path):
-            num_objects += 1
+        for num_objects, obj in enumerate(bucket.objects.filter(Prefix=path), start=1):
             if obj.key == path:
                 return False
             # If there are more than 1 object in filter, then it is a directory
@@ -277,8 +268,7 @@ class IBMCosCloudStorage(CloudStorage):
             f'{bucket_rclone_profile}:{data_path_in_bucket} {destination}')
 
         all_commands = list(self._GET_RCLONE)
-        all_commands.append(configure_rclone)
-        all_commands.append(download_via_rclone)
+        all_commands.extend((configure_rclone, download_via_rclone))
         return ' && '.join(all_commands)
 
     def make_sync_dir_command(self, source: str, destination: str) -> str:

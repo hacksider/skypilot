@@ -22,9 +22,10 @@ def check(quiet: bool = False, verbose: bool = False) -> None:
         status_msg = 'enabled' if ok else 'disabled'
         status_color = 'green' if ok else 'red'
         if not isinstance(cloud, clouds.Local):
-            echo('  ' + click.style(
-                f'{cloud}: {status_msg}', fg=status_color, bold=True) +
-                 ' ' * 30)
+            echo(
+                f"  {click.style(f'{cloud}: {status_msg}', fg=status_color, bold=True)}"
+                + ' ' * 30
+            )
         if ok:
             enabled_clouds.append(str(cloud))
             if verbose:
@@ -44,15 +45,16 @@ def check(quiet: bool = False, verbose: bool = False) -> None:
     echo(f'  Checking {cloud}...', nl=False)
     r2_is_enabled, reason = cloudflare.check_credentials()
     echo('\r', nl=False)
-    status_msg = 'enabled' if r2_is_enabled else 'disabled'
     status_color = 'green' if r2_is_enabled else 'red'
-    echo('  ' +
-         click.style(f'{cloud}: {status_msg}', fg=status_color, bold=True) +
-         ' ' * 30)
+    status_msg = 'enabled' if r2_is_enabled else 'disabled'
+    echo(
+        f"  {click.style(f'{cloud}: {status_msg}', fg=status_color, bold=True)}"
+        + ' ' * 30
+    )
     if not r2_is_enabled:
         echo(f'    Reason: {reason}')
 
-    if len(enabled_clouds) == 0 and not r2_is_enabled:
+    if not enabled_clouds and not r2_is_enabled:
         click.echo(
             click.style(
                 'No cloud is enabled. SkyPilot will not be able to run any '

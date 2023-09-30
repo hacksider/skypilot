@@ -77,14 +77,13 @@ class oci_conf:
         # Allow task(cluster)-specific compartment/VCN parameters.
         default_compartment_ocid = skypilot_config.get_nested(
             ("oci", "default", "compartment_ocid"), None)
-        compartment = skypilot_config.get_nested(
-            ("oci", region, "compartment_ocid"), default_compartment_ocid)
-        return compartment
+        return skypilot_config.get_nested(
+            ("oci", region, "compartment_ocid"), default_compartment_ocid
+        )
 
     @classmethod
     def get_vcn_subnet(cls, region):
-        vcn = skypilot_config.get_nested(("oci", region, "vcn_subnet"), None)
-        return vcn
+        return skypilot_config.get_nested(("oci", region, "vcn_subnet"), None)
 
     @classmethod
     def get_default_gpu_image_tag(cls) -> str:
@@ -105,11 +104,11 @@ class oci_conf:
     def get_sky_user_config_file(cls) -> str:
         config_path_via_env_var = os.environ.get(
             skypilot_config.ENV_VAR_SKYPILOT_CONFIG)
-        if config_path_via_env_var is not None:
-            config_path = config_path_via_env_var
-        else:
-            config_path = skypilot_config.CONFIG_PATH
-        return config_path
+        return (
+            config_path_via_env_var
+            if config_path_via_env_var is not None
+            else skypilot_config.CONFIG_PATH
+        )
 
     @classmethod
     def get_profile(cls) -> str:

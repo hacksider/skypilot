@@ -34,7 +34,7 @@ def test_bucket_transfer():
     # First time upload to s3
     storage_1 = storage.Storage(name=TEST_BUCKET_NAME, source=LOCAL_SOURCE_PATH)
     store = storage_1.add_store(StoreType.S3)  # Transfers local to S3
-    storage_2 = storage.Storage(source="s3://" + TEST_BUCKET_NAME)
+    storage_2 = storage.Storage(source=f"s3://{TEST_BUCKET_NAME}")
     storage_2.add_store(StoreType.GCS)  # Transfer data from S3 to GCS bucket
 
 

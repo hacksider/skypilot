@@ -60,12 +60,7 @@ def _bulk_provision(
 
     style = colorama.Style
 
-    if not zones:
-        # For Azure, zones is always an empty list.
-        zone_str = 'all zones'
-    else:
-        zone_str = ','.join(z.name for z in zones)
-
+    zone_str = 'all zones' if not zones else ','.join(z.name for z in zones)
     if isinstance(cloud, clouds.Local):
         logger.info(f'{style.BRIGHT}Launching on local cluster '
                     f'{cluster_name!r}.')
@@ -160,9 +155,7 @@ def bulk_provision(
             return _bulk_provision(cloud, region, zones, cluster_name,
                                    bootstrap_config)
         except Exception:  # pylint: disable=broad-except
-            zone_str = 'all zones'
-            if zones:
-                zone_str = ','.join(zone.name for zone in zones)
+            zone_str = ','.join(zone.name for zone in zones) if zones else 'all zones'
             logger.debug(f'Failed to provision {cluster_name.display_name!r} '
                          f'on {cloud} ({zone_str}).')
             logger.debug(f'bulk_provision for {cluster_name!r} '

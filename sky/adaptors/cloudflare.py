@@ -62,13 +62,12 @@ def get_r2_credentials(boto3_session):
     """
     with _load_r2_credentials_env():
         cloudflare_credentials = boto3_session.get_credentials()
-        if cloudflare_credentials is None:
-            with ux_utils.print_exception_no_traceback():
-                raise ValueError('Cloudflare credentials not found. Run '
-                                 '`sky check` to verify credentials are '
-                                 'correctly set up.')
-        else:
+        if cloudflare_credentials is not None:
             return cloudflare_credentials.get_frozen_credentials()
+        with ux_utils.print_exception_no_traceback():
+            raise ValueError('Cloudflare credentials not found. Run '
+                             '`sky check` to verify credentials are '
+                             'correctly set up.')
 
 
 # lru_cache() is thread-safe and it will return the same session object
@@ -157,9 +156,7 @@ def create_endpoint():
         accountid = lines[0]
 
     accountid = accountid.strip()
-    endpoint = 'https://' + accountid + '.r2.cloudflarestorage.com'
-
-    return endpoint
+    return f'https://{accountid}.r2.cloudflarestorage.com'
 
 
 def check_credentials() -> Tuple[bool, Optional[str]]:
@@ -218,8 +215,7 @@ def get_credential_file_mounts() -> Dict[str, str]:
         file_mounts: stores path to credential files of clouds
     """
 
-    r2_credential_mounts = {
+    return {
         R2_CREDENTIALS_PATH: R2_CREDENTIALS_PATH,
-        ACCOUNT_ID_PATH: ACCOUNT_ID_PATH
+        ACCOUNT_ID_PATH: ACCOUNT_ID_PATH,
     }
-    return r2_credential_mounts

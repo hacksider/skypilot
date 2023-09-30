@@ -104,10 +104,7 @@ def get_default_instance_type(cpus: Optional[str] = None,
     if cpus is None and memory is None:
         cpus = f'{_DEFAULT_NUM_VCPUS}+'
 
-    if memory is None:
-        memory_gb_or_ratio = f'{_DEFAULT_MEMORY}+'
-    else:
-        memory_gb_or_ratio = memory
+    memory_gb_or_ratio = f'{_DEFAULT_MEMORY}+' if memory is None else memory
     instance_type_prefix = f'{_DEFAULT_INSTANCE_FAMILY}-'
     df = _df[_df['InstanceType'].str.startswith(instance_type_prefix)]
     return common.get_instance_type_for_cpus_mem_impl(df, cpus,

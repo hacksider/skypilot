@@ -83,10 +83,5 @@ def get_mounting_command(
     # While these commands are run sequentially for each storage object,
     # we add random int to be on the safer side and avoid collisions.
     script_path = f'~/.sky/mount_{random.randint(0, 1000000)}.sh'
-    first_line = r'(cat <<-\EOF > {}'.format(script_path)
-    command = (f'{first_line}'
-               f'{script}'
-               f') && chmod +x {script_path}'
-               f' && bash {script_path}'
-               f' && rm {script_path}')
-    return command
+    first_line = f'(cat <<-\EOF > {script_path}'
+    return f'{first_line}{script}) && chmod +x {script_path} && bash {script_path} && rm {script_path}'

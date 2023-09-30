@@ -260,8 +260,6 @@ class OCI(clouds.Cloud):
                 # monkeypatched. In real use, if the OCI config is not
                 # valid, the 'sky check' would fail (OCI disabled).
                 logger.debug(f'It is OK goes here when testing: {str(e)}')
-                pass
-
         # Disk performane: Volume Performance Units.
         vpu = self.get_vpu_from_disktier(
             cpus=None if cpus is None else float(cpus),
@@ -489,16 +487,12 @@ class OCI(clouds.Cloud):
 
         if acc is None:
             image_tag = oci_conf.get_default_image_tag()
-            image_id_str = service_catalog.get_image_id_from_tag(image_tag,
-                                                                 region_name,
-                                                                 clouds='oci')
         else:
             assert len(acc) == 1, acc
             image_tag = oci_conf.get_default_gpu_image_tag()
-            image_id_str = service_catalog.get_image_id_from_tag(image_tag,
-                                                                 region_name,
-                                                                 clouds='oci')
-
+        image_id_str = service_catalog.get_image_id_from_tag(image_tag,
+                                                             region_name,
+                                                             clouds='oci')
         if image_id_str is not None:
             logger.debug(
                 f'Got default image_id {image_id_str} from tag {image_tag}')

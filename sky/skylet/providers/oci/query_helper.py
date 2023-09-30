@@ -53,9 +53,7 @@ class oci_query_helper:
 
         list_instances_response = oci_adaptor.get_search_client(
             region, oci_conf.get_profile()).search_resources(qv)
-        result_set = list_instances_response.data.items
-
-        return result_set
+        return list_instances_response.data.items
 
     @classmethod
     def terminate_instances_by_tags(cls, tag_filters, region) -> int:
@@ -75,7 +73,7 @@ class oci_query_helper:
                 traceback.print_exc()
 
         if fail_count == 0:
-            logger.debug(f"Instance teardown result: OK")
+            logger.debug("Instance teardown result: OK")
         else:
             logger.warn(f"Instance teardown result: {fail_count} failed!")
 
@@ -169,27 +167,25 @@ class oci_query_helper:
             display_name=oci_conf.VCN_NAME,
             lifecycle_state="AVAILABLE")
         vcns = list_vcns_response.data
-        if len(vcns) > 0:
-            # Found the VCN.
-            skypilot_vcn = vcns[0].id
-            list_subnets_response = net_client.list_subnets(
-                compartment_id=skypilot_compartment,
-                limit=1,
-                vcn_id=skypilot_vcn,
-                display_name=oci_conf.VCN_SUBNET_NAME,
-                lifecycle_state="AVAILABLE")
-            logger.debug(f'Got VCN subnet \n{list_subnets_response.data}')
-            if len(list_subnets_response.data) < 1:
-                logger.error(f'No subnet {oci_conf.VCN_SUBNET_NAME} '
-                             f'found in the VCN {oci_conf.VCN_NAME}')
-                raise RuntimeError(f'VcnSubnetNotFound Error: No subnet '
-                                   f'{oci_conf.VCN_SUBNET_NAME} found in '
-                                   f'the VCN {oci_conf.VCN_NAME}')
-            subnet = list_subnets_response.data[0].id
-            return subnet
-        else:
+        if len(vcns) <= 0:
             # Create the skypilot_vcn and related resources
             return cls.create_vcn_subnet(net_client, skypilot_compartment)
+        # Found the VCN.
+        skypilot_vcn = vcns[0].id
+        list_subnets_response = net_client.list_subnets(
+            compartment_id=skypilot_compartment,
+            limit=1,
+            vcn_id=skypilot_vcn,
+            display_name=oci_conf.VCN_SUBNET_NAME,
+            lifecycle_state="AVAILABLE")
+        logger.debug(f'Got VCN subnet \n{list_subnets_response.data}')
+        if len(list_subnets_response.data) < 1:
+            logger.error(f'No subnet {oci_conf.VCN_SUBNET_NAME} '
+                         f'found in the VCN {oci_conf.VCN_NAME}')
+            raise RuntimeError(f'VcnSubnetNotFound Error: No subnet '
+                               f'{oci_conf.VCN_SUBNET_NAME} found in '
+                               f'the VCN {oci_conf.VCN_NAME}')
+        return list_subnets_response.data[0].id
 
     @classmethod
     @utils.debug_enabled(logger=logger)
@@ -238,12 +234,14 @@ class oci_query_helper:
             subnet = create_subnet_response.data.id
 
             list_services_response = net_client.list_services(limit=100)
-            services = [
-                s for s in list_services_response.data
-                if str(s.cidr_block).startswith('all-') and str(s.cidr_block).
-                endswith('-services-in-oracle-services-network')
-            ]
-            if len(services) > 0:
+            if services := [
+                s
+                for s in list_services_response.data
+                if str(s.cidr_block).startswith('all-')
+                and str(s.cidr_block).endswith(
+                    '-services-in-oracle-services-network'
+                )
+            ]:
                 # Create service gateway for regional services.
                 create_sg_response = net_client.create_service_gateway(
                     create_service_gateway_details=oci_adaptor.get_oci(
@@ -360,7 +358,7 @@ class oci_query_helper:
                     break
                 except oci_adaptor.service_exception() as e:
                     logger.info(f'Waiting del SG/IG/Subnet finish: {str(e)}')
-                    retry_count = retry_count + 1
+                    retry_count += 1
                     if retry_count == oci_conf.MAX_RETRY_COUNT:
                         raise e
                     else:

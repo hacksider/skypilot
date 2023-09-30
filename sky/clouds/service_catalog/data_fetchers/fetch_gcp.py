@@ -203,8 +203,7 @@ def _get_machine_types(region_prefix: str) -> pd.DataFrame:
     else:
         with multiprocessing.Pool() as pool:
             all_machine_dfs = pool.map(_get_machine_type_for_zone, zones)
-    machine_df = pd.concat(all_machine_dfs, ignore_index=True)
-    return machine_df
+    return pd.concat(all_machine_dfs, ignore_index=True)
 
 
 def get_vm_df(skus: List[Dict[str, Any]], region_prefix: str) -> pd.DataFrame:
@@ -320,8 +319,7 @@ def _get_gpus(region_prefix: str) -> pd.DataFrame:
     else:
         with multiprocessing.Pool() as pool:
             all_gpu_dfs = pool.map(_get_gpus_for_zone, zones)
-    gpu_df = pd.concat(all_gpu_dfs, ignore_index=True)
-    return gpu_df
+    return pd.concat(all_gpu_dfs, ignore_index=True)
 
 
 def get_gpu_df(skus: List[Dict[str, Any]], region_prefix: str) -> pd.DataFrame:
@@ -379,8 +377,7 @@ def _get_tpu_for_zone(zone: str) -> pd.DataFrame:
         parent=parent)
     try:
         tpus_response = tpus_request.execute()
-        for tpu in tpus_response['acceleratorTypes']:
-            tpus.append(tpu)
+        tpus.extend(iter(tpus_response['acceleratorTypes']))
     except gcp.http_error_exception() as error:
         if error.resp.status == 403:
             print('  TPU API is not enabled or you don\'t have TPU access '
@@ -408,8 +405,7 @@ def _get_tpus() -> pd.DataFrame:
     else:
         with multiprocessing.Pool() as pool:
             all_tpu_dfs = pool.map(_get_tpu_for_zone, zones)
-    tpu_df = pd.concat(all_tpu_dfs, ignore_index=True)
-    return tpu_df
+    return pd.concat(all_tpu_dfs, ignore_index=True)
 
 
 # TODO: the TPUs fetched fails to contain us-east1

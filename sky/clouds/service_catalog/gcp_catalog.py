@@ -178,9 +178,7 @@ def _is_power_of_two(x: int) -> bool:
 
 def _closest_power_of_two(x: int) -> int:
     """Returns the closest power of 2 less than or equal to x."""
-    if _is_power_of_two(x):
-        return x
-    return 1 << ((x - 1).bit_length() - 1)
+    return x if _is_power_of_two(x) else 1 << ((x - 1).bit_length() - 1)
 
 
 def get_quota_code(accelerator: str, use_spot: bool) -> Optional[str]:
@@ -191,15 +189,11 @@ def get_quota_code(accelerator: str, use_spot: bool) -> Optional[str]:
     to check for a non-zero quota.
     """
 
-    if use_spot:
-        spot_header = 'SpotInstanceCode'
-    else:
-        spot_header = 'OnDemandInstanceCode'
+    spot_header = 'SpotInstanceCode' if use_spot else 'OnDemandInstanceCode'
     try:
-        quota_code = _quotas_df.loc[_quotas_df['Accelerator'] == accelerator,
-                                    spot_header].values[0]
-        return quota_code
-
+        return _quotas_df.loc[
+            _quotas_df['Accelerator'] == accelerator, spot_header
+        ].values[0]
     except IndexError:
         return None
 
@@ -279,10 +273,7 @@ def get_instance_type_for_accelerator(
         # Check the cpus and memory specified by the user.
         instance_type = common.get_instance_type_for_cpus_mem_impl(
             df, cpus, memory)
-        if instance_type is None:
-            return None, []
-        return [instance_type], []
-
+        return (None, []) if instance_type is None else ([instance_type], [])
     if acc_name not in _NUM_ACC_TO_NUM_CPU:
         acc_name = 'DEFAULT'
 
@@ -301,9 +292,7 @@ def get_instance_type_for_accelerator(
 
     instance_type = common.get_instance_type_for_cpus_mem_impl(df, cpus, memory)
     # The fuzzy candidate should have already been fetched in the caller.
-    if instance_type is None:
-        return None, []
-    return [instance_type], []
+    return (None, []) if instance_type is None else ([instance_type], [])
 
 
 def validate_region_zone(
@@ -375,13 +364,15 @@ def list_accelerators(
                                             region_filter, quantity_filter,
                                             case_sensitive)
 
-    # Remove GPUs that are unsupported by SkyPilot.
-    new_results = {}
-    for acc_name, acc_info in results.items():
-        if (acc_name.startswith('tpu') or
-                acc_name in _NUM_ACC_TO_MAX_CPU_AND_MEMORY or
-                acc_name in _ACC_INSTANCE_TYPE_DICTS):
-            new_results[acc_name] = acc_info
+    new_results = {
+        acc_name: acc_info
+        for acc_name, acc_info in results.items()
+        if (
+            acc_name.startswith('tpu')
+            or acc_name in _NUM_ACC_TO_MAX_CPU_AND_MEMORY
+            or acc_name in _ACC_INSTANCE_TYPE_DICTS
+        )
+    }
     results = new_results
 
     # Unlike other GPUs that can be attached to different sizes of N1 VMs,
@@ -390,7 +381,8 @@ def list_accelerators(
     # Thus, we can show their exact cost including the host VM prices.
 
     acc_infos: List[common.InstanceTypeInfo] = sum(
-        [results.get(a, []) for a in _ACC_INSTANCE_TYPE_DICTS], [])
+        (results.get(a, []) for a in _ACC_INSTANCE_TYPE_DICTS), []
+    )
     if not acc_infos:
         return results
 

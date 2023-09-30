@@ -46,11 +46,7 @@ def add_column_to_table(
                     f'WHERE {column_name} IS NULL',
                     (default_value_to_replace_nulls,))
         except sqlite3.OperationalError as e:
-            if 'duplicate column name' in str(e):
-                # We may be trying to add the same column twice, when
-                # running multiple threads. This is fine.
-                pass
-            else:
+            if 'duplicate column name' not in str(e):
                 raise
     conn.commit()
 

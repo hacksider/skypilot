@@ -153,9 +153,7 @@ class GCPNodeProvider(NodeProvider):
 
             resource = self._get_resource_depending_on_node_name(node_id)
 
-            result = resource.set_labels(node=node, labels=labels)
-
-            return result
+            return resource.set_labels(node=node, labels=labels)
 
     def external_ip(self, node_id: str):
         with self.lock:
@@ -242,9 +240,7 @@ class GCPNodeProvider(NodeProvider):
                     reuse_nodes = nodes_matching_launch_config[:count]
                 else:
                     nodes_all = resource._list_instances(filters, STOPPED_STATUS)
-                    nodes_matching_launch_config_ids = set(
-                        n.id for n in nodes_matching_launch_config
-                    )
+                    nodes_matching_launch_config_ids = {n.id for n in nodes_matching_launch_config}
                     nodes_non_matching_launch_config = [
                         n
                         for n in nodes_all
@@ -319,9 +315,7 @@ class GCPNodeProvider(NodeProvider):
                         elif instance.is_stopping():
                             time.sleep(POLL_INTERVAL)
                         else:
-                            raise RuntimeError(
-                                f"Unexpected instance status." " Details: {instance}"
-                            )
+                            raise RuntimeError('Unexpected instance status. Details: {instance}')
 
                     if instance.is_stopping():
                         raise RuntimeError(
@@ -354,9 +348,7 @@ class GCPNodeProvider(NodeProvider):
                 return self.cached_nodes[node_id]
 
             resource = self._get_resource_depending_on_node_name(node_id)
-            instance = resource.get_instance(node_id=node_id)
-
-            return instance
+            return resource.get_instance(node_id=node_id)
 
     def _get_cached_node(self, node_id: str) -> GCPNode:
         if node_id in self.cached_nodes:

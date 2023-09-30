@@ -36,9 +36,7 @@ def evaluate(model, device, test_loader):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
 
-    accuracy = correct / total
-
-    return accuracy
+    return correct / total
 
 
 def main():
@@ -123,7 +121,7 @@ def main():
     # Encapsulate the model on the GPU assigned to the current process
     model = torchvision.models.resnet18(pretrained=False)
 
-    device = torch.device("cuda:{}".format(local_rank))
+    device = torch.device(f"cuda:{local_rank}")
     model = model.to(device)
     ddp_model = torch.nn.parallel.DistributedDataParallel(
         model, device_ids=[local_rank], output_device=local_rank)
@@ -171,7 +169,7 @@ def main():
     # We only save the model who uses device "cuda:0"
     # To resume, the device for the saved model would also be "cuda:0"
     if resume == True and os.path.exists(model_filepath):
-        map_location = {"cuda:0": "cuda:{}".format(local_rank)}
+        map_location = {"cuda:0": f"cuda:{local_rank}"}
         states = torch.load(model_filepath, map_location=map_location)
         start_epoch = states['epoch']
         optimizer.load_state_dict(states['optimizer'])
@@ -182,8 +180,7 @@ def main():
 
         # Save and evaluate model routinely
         if epoch % 10 == 0:
-            print("Local Rank: {}, Epoch: {}, Training ...".format(
-                local_rank, epoch))
+            print(f"Local Rank: {local_rank}, Epoch: {epoch}, Training ...")
             if local_rank == 0:
                 accuracy = evaluate(model=ddp_model,
                                     device=device,
@@ -195,7 +192,7 @@ def main():
                 }
                 torch.save(states, model_filepath)
                 print("-" * 75)
-                print("Epoch: {}, Accuracy: {}".format(epoch, accuracy))
+                print(f"Epoch: {epoch}, Accuracy: {accuracy}")
                 print("-" * 75)
 
                 wandb.log({'epoch': epoch, 'accuracy': accuracy})

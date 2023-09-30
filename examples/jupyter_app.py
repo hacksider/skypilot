@@ -13,7 +13,7 @@ def make_application():
            conda activate jupyter && \
            pip install jupyter)'
 
-        run = f'jupyter notebook --port 8888'
+        run = 'jupyter notebook --port 8888'
 
         # Use 'ssh -L 8888:localhost:8888 <cluster_name>' to forward port to local.
         # 'ssh -L 8888:localhost:8888 sky-12345'

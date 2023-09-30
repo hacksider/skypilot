@@ -102,8 +102,7 @@ def _get_cloud_to_run(config) -> List[str]:
 
 
 def pytest_collection_modifyitems(config, items):
-    skip_marks = {}
-    skip_marks['slow'] = pytest.mark.skip(reason='need --runslow option to run')
+    skip_marks = {'slow': pytest.mark.skip(reason='need --runslow option to run')}
     skip_marks['managed_spot'] = pytest.mark.skip(
         reason='skipped, because --managed-spot option is set')
     for cloud in all_clouds_in_smoke_tests:
@@ -129,8 +128,9 @@ def pytest_collection_modifyitems(config, items):
                     continue
                 item.add_marker(skip_marks[cloud])
 
-        if (not 'managed_spot'
-                in item.keywords) and config.getoption('--managed-spot'):
+        if 'managed_spot' not in item.keywords and config.getoption(
+            '--managed-spot'
+        ):
             item.add_marker(skip_marks['managed_spot'])
 
     # Check if tests need to be run serially for Kubernetes and Lambda Cloud
@@ -160,10 +160,10 @@ def pytest_collection_modifyitems(config, items):
 
 
 def _is_generic_test(item) -> bool:
-    for cloud in all_clouds_in_smoke_tests:
-        if cloud_to_pytest_keyword[cloud] in item.keywords:
-            return False
-    return True
+    return all(
+        cloud_to_pytest_keyword[cloud] not in item.keywords
+        for cloud in all_clouds_in_smoke_tests
+    )
 
 
 def _generic_cloud(config) -> str:

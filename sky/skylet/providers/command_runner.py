@@ -35,11 +35,14 @@ def docker_start_cmds(
     docker_mount_prefix = get_docker_host_mount_location(cluster_name)
     mount = {f'{docker_mount_prefix}/{dst}': dst for dst in mount_dict}
 
-    mount_flags = ' '.join([
-        '-v {src}:{dest}'.format(src=k,
-                                 dest=v.replace('~/', home_directory + '/'))
-        for k, v in mount.items()
-    ])
+    mount_flags = ' '.join(
+        [
+            '-v {src}:{dest}'.format(
+                src=k, dest=v.replace('~/', f'{home_directory}/')
+            )
+            for k, v in mount.items()
+        ]
+    )
 
     # for click, used in ray cli
     env_vars = {'LC_ALL': 'C.UTF-8', 'LANG': 'C.UTF-8'}
@@ -50,16 +53,13 @@ def docker_start_cmds(
     docker_run = [
         docker_cmd,
         'run',
-        # SkyPilot: Remove --rm flag to keep the container after `ray stop`
-        # is executed.
-        '--name {}'.format(container_name),
+        f'--name {container_name}',
         '-d',
         '-it',
         mount_flags,
         env_flags,
         user_options_str,
         '--net=host',
-        # SkyPilot: Add following options to enable fuse.
         '--cap-add=SYS_ADMIN',
         '--device=/dev/fuse',
         '--security-opt=apparmor:unconfined',
@@ -121,18 +121,14 @@ class SkyDockerCommandRunner(DockerCommandRunner):
             # TODO(tian): Maybe support a command to get the login password?
             docker_login_config: docker_utils.DockerLoginConfig = self.docker_config[
                 "docker_login_config"]
-            self.run('{} login --username {} --password {} {}'.format(
-                self.docker_cmd,
-                docker_login_config.username,
-                docker_login_config.password,
-                docker_login_config.server,
-            ))
+            self.run(
+                f'{self.docker_cmd} login --username {docker_login_config.username} --password {docker_login_config.password} {docker_login_config.server}'
+            )
 
         if self.docker_config.get('pull_before_run', True):
             assert specific_image, ('Image must be included in config if ' +
                                     'pull_before_run is specified')
-            self.run('{} pull {}'.format(self.docker_cmd, specific_image),
-                     run_env='host')
+            self.run(f'{self.docker_cmd} pull {specific_image}', run_env='host')
         else:
 
             self.run(f'{self.docker_cmd} image inspect {specific_image} '

@@ -120,17 +120,21 @@ class GCPComputeInstance(GCPInstance):
         zone: str,
         instance: str,
     ) -> dict:
-        operation = cls.load_resource().instances().stop(
-            project=project_id,
-            zone=zone,
-            instance=instance,
-            # This is needed for the instance that has local SSDs attached by
-            # default, such as a2-highgpu-8g. Otherwise, an error will be
-            # raised. Refer to issue #2586
-            # https://cloud.google.com/compute/docs/disks/local-ssd#stop_instance
-            discardLocalSsd=False,
-        ).execute()
-        return operation
+        return (
+            cls.load_resource()
+            .instances()
+            .stop(
+                project=project_id,
+                zone=zone,
+                instance=instance,
+                # This is needed for the instance that has local SSDs attached by
+                # default, such as a2-highgpu-8g. Otherwise, an error will be
+                # raised. Refer to issue #2586
+                # https://cloud.google.com/compute/docs/disks/local-ssd#stop_instance
+                discardLocalSsd=False,
+            )
+            .execute()
+        )
 
     @classmethod
     def terminate(
@@ -139,12 +143,16 @@ class GCPComputeInstance(GCPInstance):
         zone: str,
         instance: str,
     ) -> dict:
-        operation = cls.load_resource().instances().delete(
-            project=project_id,
-            zone=zone,
-            instance=instance,
-        ).execute()
-        return operation
+        return (
+            cls.load_resource()
+            .instances()
+            .delete(
+                project=project_id,
+                zone=zone,
+                instance=instance,
+            )
+            .execute()
+        )
 
     @classmethod
     def filter(
@@ -395,14 +403,24 @@ class GCPTPUVMInstance(GCPInstance):
     def stop(cls, project_id: str, zone: str, instance: str) -> dict:
         """Stop a TPU node."""
         del project_id, zone  # unused
-        operation = cls.load_resource().projects().locations().nodes().stop(
-            name=instance).execute()
-        return operation
+        return (
+            cls.load_resource()
+            .projects()
+            .locations()
+            .nodes()
+            .stop(name=instance)
+            .execute()
+        )
 
     @classmethod
     def terminate(cls, project_id: str, zone: str, instance: str) -> dict:
         """Terminate a TPU node."""
         del project_id, zone  # unused
-        operation = cls.load_resource().projects().locations().nodes().delete(
-            name=instance).execute()
-        return operation
+        return (
+            cls.load_resource()
+            .projects()
+            .locations()
+            .nodes()
+            .delete(name=instance)
+            .execute()
+        )

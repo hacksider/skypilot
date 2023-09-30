@@ -66,9 +66,7 @@ def _is_valid_name(name: Optional[str]) -> bool:
         _thisshouldntwork
         thisshouldntwork_
     """
-    if name is None:
-        return True
-    return bool(re.fullmatch(_VALID_NAME_REGEX, name))
+    return True if name is None else bool(re.fullmatch(_VALID_NAME_REGEX, name))
 
 
 def _fill_in_env_vars_in_file_mounts(
@@ -152,8 +150,10 @@ def _with_docker_login_config(
         server_prefix = f'{docker_login_config.server}/'
         if not docker_image.startswith(server_prefix):
             docker_image = f'{server_prefix}{docker_image}'
-        return resources.copy(image_id={region: 'docker:' + docker_image},
-                              _docker_login_config=docker_login_config)
+        return resources.copy(
+            image_id={region: f'docker:{docker_image}'},
+            _docker_login_config=docker_login_config,
+        )
 
     return {_add_docker_login_config(resources) for resources in resources_set}
 
@@ -307,10 +307,6 @@ class Task:
                     raise ValueError(
                         'run command generator must be self contained. '
                         f'Found globals: {run_closure.globals}')
-            if run_closure.unbound:
-                # Do not raise an error here. Import statements, which are
-                # allowed, will be considered as unbounded.
-                pass
         elif self.run is not None and not isinstance(self.run, str):
             with ux_utils.print_exception_no_traceback():
                 raise ValueError('run must be either a shell script (str) or '
@@ -496,7 +492,7 @@ class Task:
         if envs is None:
             envs = {}
         if isinstance(envs, (list, tuple)):
-            keys = set(env[0] for env in envs)
+            keys = {env[0] for env in envs}
             if len(keys) != len(envs):
                 with ux_utils.print_exception_no_traceback():
                     raise ValueError('Duplicate env keys provided.')
@@ -836,8 +832,7 @@ class Task:
                 enabled_storage_clouds[0])
             assert storage_cloud is not None, enabled_storage_clouds[0]
 
-        store_type = storage_lib.get_storetype_from_cloud(storage_cloud)
-        return store_type
+        return storage_lib.get_storetype_from_cloud(storage_cloud)
 
     def sync_storage_mounts(self) -> None:
         """(INTERNAL) Eagerly syncs storage mounts to cloud storage.
@@ -867,7 +862,7 @@ class Task:
                         blob_path = storage.source
                     else:
                         assert storage.name is not None, storage
-                        blob_path = 's3://' + storage.name
+                        blob_path = f's3://{storage.name}'
                     self.update_file_mounts({
                         mnt_path: blob_path,
                     })
@@ -877,7 +872,7 @@ class Task:
                         blob_path = storage.source
                     else:
                         assert storage.name is not None, storage
-                        blob_path = 'gs://' + storage.name
+                        blob_path = f'gs://{storage.name}'
                     self.update_file_mounts({
                         mnt_path: blob_path,
                     })
@@ -887,7 +882,7 @@ class Task:
                             list) and storage.source.startswith('r2://'):
                         blob_path = storage.source
                     else:
-                        blob_path = 'r2://' + storage.name
+                        blob_path = f'r2://{storage.name}'
                     self.update_file_mounts({
                         mnt_path: blob_path,
                     })
@@ -922,12 +917,12 @@ class Task:
         """
         if self.file_mounts is None:
             return None
-        d = {}
-        for k, v in self.file_mounts.items():
-            if not data_utils.is_cloud_store_url(
-                    k) and not data_utils.is_cloud_store_url(v):
-                d[k] = v
-        return d
+        return {
+            k: v
+            for k, v in self.file_mounts.items()
+            if not data_utils.is_cloud_store_url(k)
+            and not data_utils.is_cloud_store_url(v)
+        }
 
     def get_cloud_to_remote_file_mounts(self) -> Optional[Dict[str, str]]:
         """Returns file mounts of the form (dst=VM path, src=cloud URL).
@@ -939,12 +934,12 @@ class Task:
         """
         if self.file_mounts is None:
             return None
-        d = {}
-        for k, v in self.file_mounts.items():
-            if not data_utils.is_cloud_store_url(
-                    k) and data_utils.is_cloud_store_url(v):
-                d[k] = v
-        return d
+        return {
+            k: v
+            for k, v in self.file_mounts.items()
+            if not data_utils.is_cloud_store_url(k)
+            and data_utils.is_cloud_store_url(v)
+        }
 
     def to_yaml_config(self) -> Dict[str, Any]:
         """Returns a yaml-style dict representation of the task.

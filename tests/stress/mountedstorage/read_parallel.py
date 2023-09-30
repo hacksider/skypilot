@@ -12,8 +12,7 @@ def parse_args():
     parser.add_argument('--list',
                         action='store_true',
                         help='List files before reading')
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def sizeof_fmt(num, suffix="B"):

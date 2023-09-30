@@ -144,35 +144,26 @@ def setup_gcp_authentication(config: Dict[str, Any]) -> Dict[str, Any]:
     try:
         project = compute.projects().get(project=project_id).execute()
     except gcp.http_error_exception() as e:
-        # Can happen for a new project where Compute Engine API is disabled.
-        #
-        # Example message:
-        # 'Compute Engine API has not been used in project 123456 before
-        # or it is disabled. Enable it by visiting
-        # https://console.developers.google.com/apis/api/compute.googleapis.com/overview?project=123456
-        # then retry. If you enabled this API recently, wait a few minutes for
-        # the action to propagate to our systems and retry.'
-        if ' API has not been used in project' in e.reason:
-            match = re.fullmatch(r'(.+)(https://.*project=\d+) (.+)', e.reason)
-            if match is None:
-                raise  # This should not happen.
-            yellow = colorama.Fore.YELLOW
-            reset = colorama.Style.RESET_ALL
-            bright = colorama.Style.BRIGHT
-            dim = colorama.Style.DIM
-            logger.error(
-                f'{yellow}Certain GCP APIs are disabled for the GCP project '
-                f'{project_id}.{reset}')
-            logger.error('Details:')
-            logger.error(f'{dim}{match.group(1)}{reset}\n'
-                         f'{dim}    {match.group(2)}{reset}\n'
-                         f'{dim}{match.group(3)}{reset}')
-            logger.error(
-                f'{yellow}To fix, enable these APIs by running:{reset} '
-                f'{bright}sky check{reset}')
-            sys.exit(1)
-        else:
+        if ' API has not been used in project' not in e.reason:
             raise
+        match = re.fullmatch(r'(.+)(https://.*project=\d+) (.+)', e.reason)
+        if match is None:
+            raise  # This should not happen.
+        yellow = colorama.Fore.YELLOW
+        reset = colorama.Style.RESET_ALL
+        bright = colorama.Style.BRIGHT
+        dim = colorama.Style.DIM
+        logger.error(
+            f'{yellow}Certain GCP APIs are disabled for the GCP project '
+            f'{project_id}.{reset}')
+        logger.error('Details:')
+        logger.error(f'{dim}{match.group(1)}{reset}\n'
+                     f'{dim}    {match.group(2)}{reset}\n'
+                     f'{dim}{match.group(3)}{reset}')
+        logger.error(
+            f'{yellow}To fix, enable these APIs by running:{reset} '
+            f'{bright}sky check{reset}')
+        sys.exit(1)
     except socket.timeout:
         logger.error('Socket timed out when trying to get the GCP project. '
                      'Please check your network connection.')
@@ -198,14 +189,11 @@ def setup_gcp_authentication(config: Dict[str, Any]) -> Dict[str, Any]:
         if proc.returncode == 0:
             try:
                 profile = yaml.safe_load(proc.stdout)
-                username = profile['posixAccounts'][0]['username']
-                if username:
+                if username := profile['posixAccounts'][0]['username']:
                     os_login_username = username
             except Exception as e:  # pylint: disable=broad-except
                 logger.debug('Failed to parse gcloud os-login profile.\n'
                              f'{common_utils.format_exception(e)}')
-                pass
-
         if os_login_username is None:
             # As a fallback, read the account information from the credential
             # file. This works most of the time, but fails if the user's
@@ -361,8 +349,7 @@ def setup_kubernetes_authentication(config: Dict[str, Any]) -> Dict[str, Any]:
         # Add message saying "Please check: ~/.sky/config.yaml" to the error
         # message.
         with ux_utils.print_exception_no_traceback():
-            raise ValueError(str(e) + ' Please check: ~/.sky/config.yaml.') \
-                from None
+            raise ValueError(f'{str(e)} Please check: ~/.sky/config.yaml.') from None
     get_or_generate_keys()
 
     # Run kubectl command to add the public key to the cluster.

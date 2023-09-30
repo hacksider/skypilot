@@ -121,8 +121,7 @@ class SCPNodeProvider(NodeProvider):
                 return
             # Compute launch hash
             head_node_config = config.get('head_node', {})
-            head_node_type = config.get('head_node_type')
-            if head_node_type:
+            if head_node_type := config.get('head_node_type'):
                 head_config = config['available_node_types'][head_node_type]
                 head_node_config.update(head_config["node_config"])
             launch_hash = hash_launch_conf(head_node_config, config['auth'])
@@ -221,29 +220,22 @@ class SCPNodeProvider(NodeProvider):
     def node_tags(self, node_id: str) -> Dict[str, str]:
         """Returns the tags of the given node (string dict)."""
         cached_node = self._get_cached_node(node_id=node_id)
-        if cached_node is None:
-            return {}
-        return cached_node['tags']
+        return {} if cached_node is None else cached_node['tags']
 
     def external_ip(self, node_id: str) -> Optional[str]:
         """Returns the external ip of the given node."""
         cached_node = self._get_cached_node(node_id=node_id)
-        if cached_node is None:
-            return None
-        return cached_node['external_ip']
+        return None if cached_node is None else cached_node['external_ip']
 
     def internal_ip(self, node_id: str) -> Optional[str]:
         """Returns the internal ip (Ray ip) of the given node."""
         cached_node = self._get_cached_node(node_id=node_id)
-        if cached_node is None:
-            return None
-        return cached_node['internal_ip']
+        return None if cached_node is None else cached_node['internal_ip']
 
     def _config_security_group(self, zone_id, vpc, cluster_name):
         sg_name = cluster_name.replace("-", "") + "sg"
         if len(sg_name) > 20:
-            sg_name = sg_name[:9] + '0' + sg_name[
-                -10:]  # should be less than 21
+            sg_name = f'{sg_name[:9]}0{sg_name[-10:]}'
 
         undo_func_stack = []
         try:
@@ -259,7 +251,7 @@ class SCPNodeProvider(NodeProvider):
                     for sg in sg_contents
                     if sg["securityGroupId"] == sg_id
                 ]
-                if len(sg) != 0 and sg[0] == "ACTIVE":
+                if sg and sg[0] == "ACTIVE":
                     break
                 time.sleep(5)
 
@@ -282,7 +274,7 @@ class SCPNodeProvider(NodeProvider):
                 for sg in sg_contents
                 if sg["securityGroupId"] == sg_id
             ]
-            if len(sg) == 0:
+            if not sg:
                 break
 
     def _refresh_security_group(self, vms):
@@ -308,7 +300,7 @@ class SCPNodeProvider(NodeProvider):
                 for vm in vm_contents
                 if vm["virtualServerId"] == vm_id
             ]
-            if len(vms) == 0:
+            if not vms:
                 break
 
     def _del_firwall_rules(self, firewall_id, rule_ids):
@@ -347,14 +339,12 @@ class SCPNodeProvider(NodeProvider):
     def _get_firewall_id(self, vpc_id):
 
         firewall_contents = self.scp_client.list_firwalls()
-        firewall_id = [
+        return [
             firewall['firewallId']
             for firewall in firewall_contents
-            if firewall['vpcId'] == vpc_id and
-            (firewall['firewallState'] in ['ACTIVE', 'DEPLOYING'])
+            if firewall['vpcId'] == vpc_id
+            and (firewall['firewallState'] in ['ACTIVE', 'DEPLOYING'])
         ][0]
-
-        return firewall_id
 
     @_retry_on_creation
     def _create_instance(self, instance_config):
@@ -397,19 +387,20 @@ class SCPNodeProvider(NodeProvider):
 
     def _try_vm_creation(self, vpc, sg_id, config_tags, instance_config):
         vm_id, vm_internal_ip, firewall_id, firwall_rules = \
-            self._create_instance_sequence(vpc, instance_config)
+                self._create_instance_sequence(vpc, instance_config)
         if vm_id is None:
             return False  # if creation success
 
         vm_external_ip = self.scp_client.get_external_ip(
             virtual_server_id=vm_id, ip=vm_internal_ip)
-        creation_tags = {}
-        creation_tags['virtualServerId'] = vm_id
-        creation_tags['vmInternalIp'] = vm_internal_ip
-        creation_tags['firewallId'] = firewall_id
-        creation_tags['firewallRuleIds'] = firwall_rules
-        creation_tags['securityGroupId'] = sg_id
-        creation_tags['vmExternalIp'] = vm_external_ip
+        creation_tags = {
+            'virtualServerId': vm_id,
+            'vmInternalIp': vm_internal_ip,
+            'firewallId': firewall_id,
+            'firewallRuleIds': firwall_rules,
+            'securityGroupId': sg_id,
+            'vmExternalIp': vm_external_ip,
+        }
         self.metadata[vm_id] = {'tags': config_tags, 'creation': creation_tags}
         return True
 
@@ -464,7 +455,7 @@ class SCPNodeProvider(NodeProvider):
         if count:
             if (node_config['region'] not in self.my_service_zones):
                 raise SCPError('This region/zone is not available for '\
-                                'this project.')
+                                    'this project.')
 
             zone_config = ZoneConfig(self.scp_client, node_config)
             vpc_subnets = zone_config.get_vcp_subnets()
@@ -483,9 +474,9 @@ class SCPNodeProvider(NodeProvider):
                 instance_config['securityGroupIds'] = [sg_id]
                 for subnet in subnets:
                     instance_config['nic']['subnetId'] = subnet
-                    SUCCESS = self._try_vm_creation(vpc, sg_id, config_tags,
-                                                    instance_config)
-                    if SUCCESS:
+                    if SUCCESS := self._try_vm_creation(
+                        vpc, sg_id, config_tags, instance_config
+                    ):
                         return
 
                 self._del_security_group(sg_id)

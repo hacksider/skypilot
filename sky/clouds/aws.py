@@ -116,7 +116,7 @@ class AWS(clouds.Cloud):
     @classmethod
     def _cloud_unsupported_features(
             cls) -> Dict[clouds.CloudImplementationFeatures, str]:
-        return dict()
+        return {}
 
     @classmethod
     def max_cluster_name_length(cls) -> Optional[int]:
@@ -363,10 +363,7 @@ class AWS(clouds.Cloud):
         else:
             custom_resources = None
 
-        if r.extract_docker_image() is not None:
-            image_id_to_use = None
-        else:
-            image_id_to_use = r.image_id
+        image_id_to_use = None if r.extract_docker_image() is not None else r.image_id
         image_id = self._get_image_id(image_id_to_use, region_name,
                                       r.instance_type)
 
@@ -475,21 +472,20 @@ class AWS(clouds.Cloud):
 
         static_credential_exists = os.path.isfile(
             os.path.expanduser('~/.aws/credentials'))
-        hints = None
         identity_type = cls._current_identity_type()
         single_cloud_hint = (
             ' It will work if you use AWS only, but will cause problems '
             'if you want to use multiple clouds. To set up static credentials, '
             'try: aws configure')
+        hints = None
         if identity_type == AWSIdentityType.SSO:
-            hints = 'AWS SSO is set.'
-            if static_credential_exists:
-                hints += (
-                    ' To ensure multiple clouds work correctly, please use SkyPilot '
-                    'with static credentials (e.g., ~/.aws/credentials) by unsetting '
-                    'the AWS_PROFILE environment variable.')
-            else:
-                hints += single_cloud_hint
+            hints = 'AWS SSO is set.' + (
+                ' To ensure multiple clouds work correctly, please use SkyPilot '
+                'with static credentials (e.g., ~/.aws/credentials) by unsetting '
+                'the AWS_PROFILE environment variable.'
+                if static_credential_exists
+                else single_cloud_hint
+            )
         elif identity_type == AWSIdentityType.IAM_ROLE:
             # When using an IAM role, the credentials may not exist in the
             # ~/.aws/credentials file. So we don't check for the existence of the
@@ -497,13 +493,11 @@ class AWS(clouds.Cloud):
             # created by an SSO account, i.e. the VM will be assigned the IAM
             # role: skypilot-v1.
             hints = f'AWS IAM role is set.{single_cloud_hint}'
-        else:
-            # This file is required because it is required by the VMs launched on
-            # other clouds to access private s3 buckets and resources like EC2.
-            # `get_current_user_identity` does not guarantee this file exists.
-            if not static_credential_exists:
-                return (False, '~/.aws/credentials does not exist. ' +
-                        cls._STATIC_CREDENTIAL_HELP_STR)
+        elif not static_credential_exists:
+            return (
+                False,
+                f'~/.aws/credentials does not exist. {cls._STATIC_CREDENTIAL_HELP_STR}',
+            )
 
         # Fetch the AWS catalogs
         # pylint: disable=import-outside-toplevel
@@ -673,8 +667,7 @@ class AWS(clouds.Cloud):
         user_identity = cls.get_current_user_identity()
         if user_identity is None:
             return None
-        identity_str = f'{user_identity[0]} [account={user_identity[1]}]'
-        return identity_str
+        return f'{user_identity[0]} [account={user_identity[1]}]'
 
     def get_credential_file_mounts(self) -> Dict[str, str]:
         # The credentials file should not be uploaded if the user identity is
@@ -781,12 +774,7 @@ class AWS(clouds.Cloud):
             # Botocore client connection not established, try provisioning anyways
             return True
 
-        if response['Quota']['Value'] == 0:
-            # Quota found to be zero, do not try provisioning
-            return False
-
-        # Quota found to be greater than zero, try provisioning
-        return True
+        return response['Quota']['Value'] != 0
 
     @classmethod
     def query_status(cls, name: str, tag_filters: Dict[str, str],

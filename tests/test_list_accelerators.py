@@ -32,9 +32,8 @@ def test_list_accelerators_region_filter():
                                    region_filter='us-west-1')
     all_regions = []
     for res in result.values():
-        for instance in res:
-            all_regions.append(instance.region)
-    assert all([region == 'us-west-1' for region in all_regions])
+        all_regions.extend(instance.region for instance in res)
+    assert all(region == 'us-west-1' for region in all_regions)
 
 
 def test_list_accelerators_name_quantity_filter():
@@ -42,13 +41,14 @@ def test_list_accelerators_name_quantity_filter():
     result = sky.list_accelerators(name_filter='V100', quantity_filter=4)
     all_accelerators = []
     for res in result.values():
-        for instance in res:
-            all_accelerators.append(
-                (instance.accelerator_name, instance.accelerator_count))
-    assert all([
+        all_accelerators.extend(
+            (instance.accelerator_name, instance.accelerator_count)
+            for instance in res
+        )
+    assert all(
         name.__contains__('V100') and quantity == 4
         for name, quantity in all_accelerators
-    ])
+    )
 
 
 def test_list_accelerators_positive_quantity_filter():
@@ -56,8 +56,7 @@ def test_list_accelerators_positive_quantity_filter():
     result = sky.list_accelerators(quantity_filter=4)
     all_accelerators = []
     for res in result.values():
-        for instance in res:
-            all_accelerators.append(instance.accelerator_count)
+        all_accelerators.extend(instance.accelerator_count for instance in res)
     assert all(quantity == 4 for quantity in all_accelerators)
 
 
@@ -67,13 +66,13 @@ def test_list_accelerators_name_clouds_filter():
         result = sky.list_accelerators(clouds=cloud.lower(), name_filter='V100')
         all_accelerators = []
         for res in result.values():
-            for instance in res:
-                all_accelerators.append(
-                    (instance.accelerator_name, instance.cloud))
-        assert all([
+            all_accelerators.extend(
+                (instance.accelerator_name, instance.cloud) for instance in res
+            )
+        assert all(
             name.__contains__('V100') and acc_cloud == cloud
             for name, acc_cloud in all_accelerators
-        ])
+        )
 
 
 def test_list_accelerators_name_quantity_clouds_filter():
@@ -84,11 +83,15 @@ def test_list_accelerators_name_quantity_clouds_filter():
                                        quantity_filter=4)
         all_accelerators = []
         for res in result.values():
-            for instance in res:
-                all_accelerators.append(
-                    (instance.accelerator_name, instance.cloud,
-                     instance.accelerator_count))
-        assert all([
+            all_accelerators.extend(
+                (
+                    instance.accelerator_name,
+                    instance.cloud,
+                    instance.accelerator_count,
+                )
+                for instance in res
+            )
+        assert all(
             name.__contains__('A100') and acc_cloud == cloud and quantity == 4
             for name, acc_cloud, quantity in all_accelerators
-        ])
+        )

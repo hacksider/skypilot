@@ -255,10 +255,7 @@ def read_yaml_all(path: str) -> List[Dict[str, Any]]:
     with open(path, 'r') as f:
         config = yaml.safe_load_all(f)
         configs = list(config)
-        if not configs:
-            # Empty YAML file.
-            return [{}]
-        return configs
+        return [{}] if not configs else configs
 
 
 def dump_yaml(path, config) -> None:
@@ -268,6 +265,7 @@ def dump_yaml(path, config) -> None:
 
 def dump_yaml_str(config):
     # https://github.com/yaml/pyyaml/issues/127
+
     class LineBreakDumper(yaml.SafeDumper):
 
         def write_line_break(self, data=None):
@@ -275,10 +273,7 @@ def dump_yaml_str(config):
             if len(self.indents) == 1:
                 super().write_line_break()
 
-    if isinstance(config, list):
-        dump_func = yaml.dump_all
-    else:
-        dump_func = yaml.dump
+    dump_func = yaml.dump_all if isinstance(config, list) else yaml.dump
     return dump_func(config,
                      Dumper=LineBreakDumper,
                      sort_keys=False,
@@ -324,10 +319,7 @@ def make_decorator(cls, name_or_fn: Union[str, Callable], **ctx_kwargs):
             f = name_or_fn
             func_name = getattr(f, '__qualname__', f.__name__)
             module_name = getattr(f, '__module__', '')
-            if module_name:
-                full_name = f'{module_name}.{func_name}'
-            else:
-                full_name = func_name
+            full_name = f'{module_name}.{func_name}' if module_name else func_name
             with cls(full_name, **ctx_kwargs):
                 return f(*args, **kwargs)
 
@@ -371,8 +363,7 @@ def encode_payload(payload: Any) -> str:
         A string that is encoded from the payload.
     """
     payload_str = json.dumps(payload)
-    payload_str = _PAYLOAD_STR.format(payload_str)
-    return payload_str
+    return _PAYLOAD_STR.format(payload_str)
 
 
 def decode_payload(payload_str: str) -> Any:
@@ -388,8 +379,7 @@ def decode_payload(payload_str: str) -> Any:
     if not matched:
         raise ValueError(f'Invalid payload string: \n{payload_str}')
     payload_str = matched[0]
-    payload = json.loads(payload_str)
-    return payload
+    return json.loads(payload_str)
 
 
 def class_fullname(cls, skip_builtins: bool = True):
@@ -451,7 +441,6 @@ def remove_file_if_exists(path: str):
         os.remove(path)
     except FileNotFoundError:
         logger.debug(f'Tried to remove {path} but failed to find it. Skip.')
-        pass
 
 
 def is_wsl() -> bool:

@@ -41,11 +41,6 @@ def run(cluster: Optional[str] = None, cloud: Optional[str] = None):
 
 
 if __name__ == '__main__':
-    cluster = None
-    cloud = None
-    if len(sys.argv) > 1:
-        # For smoke test passing in a cluster name.
-        cluster = sys.argv[1]
-    if len(sys.argv) > 2:
-        cloud = sys.argv[2]
+    cluster = sys.argv[1] if len(sys.argv) > 1 else None
+    cloud = sys.argv[2] if len(sys.argv) > 2 else None
     run(cluster, cloud)

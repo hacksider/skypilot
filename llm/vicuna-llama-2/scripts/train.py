@@ -167,11 +167,6 @@ def preprocess(
 
         target[cur_len:] = IGNORE_TOKEN_ID
 
-        if False:  # Inspect and check the correctness of masking
-            z = target.clone()
-            z = torch.where(z == IGNORE_TOKEN_ID, tokenizer.unk_token_id, z)
-            rank0_print(tokenizer.decode(z))
-
         if cur_len < tokenizer.model_max_length:
             if cur_len != total_len:
                 target[:] = IGNORE_TOKEN_ID
@@ -313,16 +308,10 @@ def train():
         cleanup_incomplete_checkpoints(training_args.output_dir)
     torch.distributed.barrier()
 
-    # Check the existence of checkpoints in all processes
-    # All ranks must simultaneously resume from a checkpoint if it exists.
-    # Otherwise, upon recovery the model weights may not reload correctly,
-    # causing loss spikes.
-    resume_from_checkpoint = False
     checkpoints = list(
         pathlib.Path(training_args.output_dir).glob('checkpoint-*'))
     checkpoints = [c for c in checkpoints if c.name.split('-')[-1].isdigit()]
-    if checkpoints:
-        resume_from_checkpoint = True
+    resume_from_checkpoint = bool(checkpoints)
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,

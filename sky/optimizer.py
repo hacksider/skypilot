@@ -67,11 +67,11 @@ class Optimizer:
                 dst_cloud, DummyCloud):
             return 0.0
 
-        if not src_cloud.is_same_cloud(dst_cloud):
-            egress_cost = src_cloud.get_egress_cost(num_gigabytes=gigabytes)
-        else:
-            egress_cost = 0.0
-        return egress_cost
+        return (
+            src_cloud.get_egress_cost(num_gigabytes=gigabytes)
+            if not src_cloud.is_same_cloud(dst_cloud)
+            else 0.0
+        )
 
     @staticmethod
     def _egress_time(src_cloud: clouds.Cloud, dst_cloud: clouds.Cloud,
@@ -81,15 +81,7 @@ class Optimizer:
         if isinstance(src_cloud, DummyCloud) or isinstance(
                 dst_cloud, DummyCloud):
             return 0.0
-        if not src_cloud.is_same_cloud(dst_cloud):
-            # 10Gbps is close to the average of observed b/w from S3
-            # (us-west,east-2) to GCS us-central1, assuming highly sharded files
-            # (~128MB per file).
-            bandwidth_gbps = 10
-            egress_time = gigabytes * 8 / bandwidth_gbps
-        else:
-            egress_time = 0.0
-        return egress_time
+        return gigabytes * 8 / 10 if not src_cloud.is_same_cloud(dst_cloud) else 0.0
 
     @staticmethod
     def optimize(dag: 'dag_lib.Dag',
@@ -213,10 +205,7 @@ class Optimizer:
                                                                  dst_cloud,
                                                                  nbytes)
 
-        if minimize_cost:
-            fn = Optimizer._egress_cost
-        else:
-            fn = Optimizer._egress_time
+        fn = Optimizer._egress_cost if minimize_cost else Optimizer._egress_time
         return fn(src_cloud, dst_cloud, nbytes)
 
     @staticmethod
@@ -251,7 +240,7 @@ class Optimizer:
             # Don't print for the last node, Sink.
             do_print = node_i != len(topo_order) - 1
             if do_print:
-                logger.debug('#### {} ####'.format(node))
+                logger.debug(f'#### {node} ####')
 
             fuzzy_candidates: List[str] = []
             if node_i < len(topo_order) - 1:
@@ -538,9 +527,7 @@ class Optimizer:
 
         # Formulate the objective.
         if minimize_cost:
-            objective = 0
-            for v in V:
-                objective += pulp.lpDot(c[v], k[v])
+            objective = sum(pulp.lpDot(c[v], k[v]) for v in V)
             for u, v in E:
                 objective += pulp.lpDot(e[u][v], F[u][v])
         else:
@@ -558,7 +545,7 @@ class Optimizer:
         # Solve the optimization problem.
         prob.solve(solver=pulp.PULP_CBC_CMD(msg=False))
         assert prob.status != pulp.LpStatusInfeasible, \
-            'Cannot solve the optimization problem'
+                'Cannot solve the optimization problem'
         best_total_objective = prob.objective.value()
 
         # Find the best plan for the DAG.
@@ -645,10 +632,7 @@ class Optimizer:
                                                                      dst_cloud,
                                                                      nbytes)
 
-            if minimize_cost:
-                fn = Optimizer._egress_cost
-            else:
-                fn = Optimizer._egress_time
+            fn = Optimizer._egress_cost if minimize_cost else Optimizer._egress_time
             cost_or_time = fn(src_cloud, dst_cloud, nbytes)
 
             if cost_or_time > 0:
@@ -712,7 +696,7 @@ class Optimizer:
                         f'{colorama.Style.RESET_ALL}${total_cost:.1f}\n')
 
         def _get_resources_element_list(
-                resources: 'resources_lib.Resources') -> List[str]:
+                    resources: 'resources_lib.Resources') -> List[str]:
             accelerators = resources.accelerators
             if accelerators is None:
                 accelerators = '-'
@@ -735,10 +719,7 @@ class Optimizer:
             vcpus = format_number(vcpus)
             mem = format_number(mem)
 
-            if resources.zone is None:
-                region_or_zone = resources.region
-            else:
-                region_or_zone = resources.zone
+            region_or_zone = resources.region if resources.zone is None else resources.zone
             return [
                 str(cloud),
                 resources.instance_type + spot,
@@ -799,16 +780,11 @@ class Optimizer:
 
             rows = []
             for resources, cost in best_per_cloud.values():
-                if minimize_cost:
-                    cost_str = f'{cost:.2f}'
-                else:
-                    cost_str = f'{cost / 3600:.2f}'
-
+                cost_str = f'{cost:.2f}' if minimize_cost else f'{cost / 3600:.2f}'
                 row = [*_get_resources_element_list(resources), cost_str, '']
                 if resources == best_plan[task]:
                     # Use tick sign for the chosen resources.
-                    row[-1] = (colorama.Fore.GREEN + '   ' + u'\u2714' +
-                               colorama.Style.RESET_ALL)
+                    row[-1] = (f'{colorama.Fore.GREEN}   ' + u'\u2714' + colorama.Style.RESET_ALL)
                 rows.append(row)
 
             # NOTE: we've converted the cost to a string above, so we should
@@ -951,10 +927,10 @@ def _make_launchables_for_valid_region_zones(
                 isinstance(launchable_resources.cloud, clouds.GCP)):
             # Spot instances.
             # Do not batch the per-zone requests.
-            for zone in region.zones:
-                launchables.append(
-                    launchable_resources.copy(region=region.name,
-                                              zone=zone.name))
+            launchables.extend(
+                launchable_resources.copy(region=region.name, zone=zone.name)
+                for zone in region.zones
+            )
         else:
             # On-demand instances.
             # Batch the requests at the granularity of a single region.
@@ -1044,7 +1020,7 @@ def _fill_in_launchable_resources(
                     clouds_list[0])
                 logger.info(f'No resource satisfying {resources} '
                             f'on {clouds_str}.')
-                if len(all_fuzzy_candidates) > 0:
+                if all_fuzzy_candidates:
                     logger.info('Did you mean: '
                                 f'{colorama.Fore.CYAN}'
                                 f'{sorted(all_fuzzy_candidates)}'

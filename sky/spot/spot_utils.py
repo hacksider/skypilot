@@ -222,7 +222,7 @@ def cancel_jobs_by_id(job_ids: Optional[List[int]]) -> str:
     if job_ids is None:
         job_ids = spot_state.get_nonterminal_job_ids_by_name(None)
     job_ids = list(set(job_ids))
-    if len(job_ids) == 0:
+    if not job_ids:
         return 'No job to cancel.'
     job_id_str = ', '.join(map(str, job_ids))
     logger.info(f'Cancelling jobs {job_id_str}.')
@@ -247,13 +247,13 @@ def cancel_jobs_by_id(job_ids: Optional[List[int]]) -> str:
         # check/removal and signal writing.
         # TODO(mraheja): remove pylint disabling when filelock version updated
         # pylint: disable=abstract-class-instantiated
-        with filelock.FileLock(str(signal_file) + '.lock'):
+        with filelock.FileLock(f'{str(signal_file)}.lock'):
             with signal_file.open('w') as f:
                 f.write(UserSignal.CANCEL.value)
                 f.flush()
         cancelled_job_ids.append(job_id)
 
-    if len(cancelled_job_ids) == 0:
+    if not cancelled_job_ids:
         return 'No job to cancel.'
     identity_str = f'Job with ID {cancelled_job_ids[0]} is'
     if len(cancelled_job_ids) > 1:
@@ -367,26 +367,25 @@ def stream_logs_by_id(job_id: int, follow: bool = True) -> str:
                 assert job_status is not None, 'No job found.'
                 if job_status != job_lib.JobStatus.CANCELLED:
                     assert task_id is not None, job_id
-                    if task_id < num_tasks - 1 and follow:
-                        # The log for the current job is finished. We need to
-                        # wait until next job to be started.
-                        logger.debug(
-                            f'INFO: Log for the current task ({task_id}) '
-                            'is finished. Waiting for the next task\'s log '
-                            'to be started.')
-                        status_display.update('Waiting for the next task: '
-                                              f'{task_id + 1}.')
-                        status_display.start()
-                        original_task_id = task_id
-                        while True:
-                            task_id, spot_status = (
-                                spot_state.get_latest_task_id_status(job_id))
-                            if original_task_id != task_id:
-                                break
-                            time.sleep(JOB_STATUS_CHECK_GAP_SECONDS)
-                        continue
-                    else:
+                    if task_id >= num_tasks - 1 or not follow:
                         break
+                    # The log for the current job is finished. We need to
+                    # wait until next job to be started.
+                    logger.debug(
+                        f'INFO: Log for the current task ({task_id}) '
+                        'is finished. Waiting for the next task\'s log '
+                        'to be started.')
+                    status_display.update('Waiting for the next task: '
+                                          f'{task_id + 1}.')
+                    status_display.start()
+                    original_task_id = task_id
+                    while True:
+                        task_id, spot_status = (
+                            spot_state.get_latest_task_id_status(job_id))
+                        if original_task_id != task_id:
+                            break
+                        time.sleep(JOB_STATUS_CHECK_GAP_SECONDS)
+                    continue
                 # The job can be cancelled by the user or the controller (when
                 # the cluster is partially preempted).
                 logger.debug(
@@ -564,11 +563,10 @@ def format_job_table(
                     if (submitted_at is None or
                             submitted_at > task['submitted_at']):
                         submitted_at = task['submitted_at']
-                if task['end_at'] is not None:
-                    if end_at is not None and end_at < task['end_at']:
-                        end_at = task['end_at']
-                else:
+                if task['end_at'] is None:
                     end_at = None
+                elif end_at is not None and end_at < task['end_at']:
+                    end_at = task['end_at']
                 recovery_cnt += task['recovery_count']
                 if spot_status == spot_state.SpotStatus.SUCCEEDED:
                     # Use the first non-succeeded status.
@@ -661,9 +659,7 @@ def format_job_table(
     output = status_str
     if str(job_table):
         output += f'\n{job_table}'
-    if return_rows:
-        return job_table.rows
-    return output
+    return job_table.rows if return_rows else output
 
 
 class SpotCodeGen:

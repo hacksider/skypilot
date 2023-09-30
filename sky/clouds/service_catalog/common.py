@@ -231,10 +231,7 @@ def get_hourly_cost_impl(
     df = _get_instance_type(df, instance_type, region, zone)
     if df.empty:
         if zone is None:
-            if region is None:
-                region_or_zone = 'all regions'
-            else:
-                region_or_zone = f'region {region!r}'
+            region_or_zone = 'all regions' if region is None else f'region {region!r}'
         else:
             region_or_zone = f'zone {zone!r}'
         with ux_utils.print_exception_no_traceback():
@@ -257,9 +254,7 @@ def get_hourly_cost_impl(
 
 
 def _get_value(value):
-    if pd.isna(value):
-        return None
-    return float(value)
+    return None if pd.isna(value) else float(value)
 
 
 def get_vcpus_mem_from_instance_type_impl(
@@ -290,10 +285,7 @@ def _filter_with_cpus(df: pd.DataFrame, cpus: Optional[str]) -> pd.DataFrame:
 
     # The following code is redundant with the code in resources.py::_set_cpus()
     # but we add it here for safety.
-    if cpus.endswith('+'):
-        num_cpus_str = cpus[:-1]
-    else:
-        num_cpus_str = cpus
+    num_cpus_str = cpus[:-1] if cpus.endswith('+') else cpus
     try:
         num_cpus = float(num_cpus_str)
     except ValueError:
@@ -377,9 +369,7 @@ def get_accelerators_from_instance_type_impl(
             raise ValueError(f'No instance type {instance_type} found.')
     row = df.iloc[0]
     acc_name, acc_count = row['AcceleratorName'], row['AcceleratorCount']
-    if pd.isnull(acc_name):
-        return None
-    return {acc_name: int(acc_count)}
+    return None if pd.isnull(acc_name) else {acc_name: int(acc_count)}
 
 
 def get_instance_type_for_accelerator_impl(
@@ -410,9 +400,10 @@ def get_instance_type_for_accelerator_impl(
                                      'AcceleratorCount']].drop_duplicates()
         fuzzy_candidate_list = []
         if len(fuzzy_result) > 0:
-            for _, row in fuzzy_result.iterrows():
-                fuzzy_candidate_list.append(f'{row["AcceleratorName"]}:'
-                                            f'{int(row["AcceleratorCount"])}')
+            fuzzy_candidate_list.extend(
+                f'{row["AcceleratorName"]}:{int(row["AcceleratorCount"])}'
+                for _, row in fuzzy_result.iterrows()
+            )
         return (None, fuzzy_candidate_list)
 
     result = _filter_with_cpus(result, cpus)
@@ -557,11 +548,10 @@ def accelerator_in_region_or_zone_impl(
     """Returns True if the accelerator is in the region or zone."""
     assert region is not None or zone is not None, (
         'Both region and zone are None.')
-    if zone is None:
-        assert region is not None
-        return _accelerator_in_region(df, accelerator_name, acc_count, region)
-    else:
+    if zone is not None:
         return _accelerator_in_zone(df, accelerator_name, acc_count, zone)
+    assert region is not None
+    return _accelerator_in_region(df, accelerator_name, acc_count, region)
 
 
 # Images
@@ -581,9 +571,7 @@ def get_image_id_from_tag_impl(df: pd.DataFrame, tag: str,
     if len(df) == 0:
         return None
     image_id = df['ImageId'].iloc[0]
-    if pd.isna(image_id):
-        return None
-    return image_id
+    return None if pd.isna(image_id) else image_id
 
 
 def is_image_tag_valid_impl(df: pd.DataFrame, tag: str,

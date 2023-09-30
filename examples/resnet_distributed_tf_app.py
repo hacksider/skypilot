@@ -41,13 +41,8 @@ def run(cluster: Optional[str] = None, cloud: Optional[str] = None):
         def run_fn(node_rank: int, ip_list: List[str]) -> Optional[str]:
             import json
             tf_config = {
-                'cluster': {
-                    'worker': [ip + ':8008' for ip in ip_list]
-                },
-                'task': {
-                    'type': 'worker',
-                    'index': node_rank
-                }
+                'cluster': {'worker': [f'{ip}:8008' for ip in ip_list]},
+                'task': {'type': 'worker', 'index': node_rank},
             }
             str_tf_config = json.dumps(tf_config)
             print(f'{str_tf_config!r}')
@@ -83,11 +78,6 @@ def run(cluster: Optional[str] = None, cloud: Optional[str] = None):
 
 
 if __name__ == '__main__':
-    cluster = None
-    cloud = None
-    if len(sys.argv) > 1:
-        # For smoke test passing in a cluster name.
-        cluster = sys.argv[1]
-    if len(sys.argv) > 2:
-        cloud = sys.argv[2]
+    cluster = sys.argv[1] if len(sys.argv) > 1 else None
+    cloud = sys.argv[2] if len(sys.argv) > 2 else None
     run(cluster, cloud)

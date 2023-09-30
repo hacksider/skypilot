@@ -45,13 +45,15 @@ class ZoneConfig:
 
     def bootstrap_instance_config(self, node_config):
 
-        instance_config = {"imageId": node_config["imageId"]}
-        instance_config['serviceZoneId'] = self.zone_id
-        instance_config['serverType'] = node_config['InstanceType']
-        instance_config['contractId'] = "None"
-        instance_config['initialScript'] = self._get_vm_init_script(
-            node_config['AuthorizedKey'])
-
+        instance_config = {
+            "imageId": node_config["imageId"],
+            'serviceZoneId': self.zone_id,
+            'serverType': node_config['InstanceType'],
+            'contractId': "None",
+            'initialScript': self._get_vm_init_script(
+                node_config['AuthorizedKey']
+            ),
+        }
         miscellaneous = {
             'deletionProtectionEnabled': False,
             'dnsEnabled': True,
@@ -102,12 +104,11 @@ class ZoneConfig:
 
         vpc_subnets = {}
         for vpc in vpc_list:
-            subnet_list = [
+            if subnet_list := [
                 item['subnetId']
                 for item in subnet_contents
                 if item['subnetState'] == 'ACTIVE' and item["vpcId"] == vpc
-            ]
-            if len(subnet_list) > 0:
+            ]:
                 vpc_subnets[vpc] = subnet_list
 
         return vpc_subnets
@@ -124,18 +125,13 @@ class ZoneConfig:
         }
 
     def _get_ssh_key_gen_cmd(self, ssh_public_key):
-        cmd_st = "mkdir -p ~/.ssh/; touch ~/.ssh/authorized_keys;"
         cmd_ed = "chmod 644 ~/.ssh/authorized_keys; chmod 700 ~/.ssh/"
 
-        cmd = "echo '{}' &>>~/.ssh/authorized_keys;".format(ssh_public_key)
+        cmd = f"echo '{ssh_public_key}' &>>~/.ssh/authorized_keys;"
 
-        return cmd_st + cmd + cmd_ed
+        return f"mkdir -p ~/.ssh/; touch ~/.ssh/authorized_keys;{cmd}{cmd_ed}"
 
     def _get_default_config_cmd(self):
         cmd_list = ["apt-get update", "apt-get -y install python3-pip"]
 
-        res = ""
-        for cmd in cmd_list:
-            res += cmd + "; "
-
-        return res
+        return "".join(f"{cmd}; " for cmd in cmd_list)

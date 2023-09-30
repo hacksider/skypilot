@@ -96,12 +96,11 @@ def _get_instance_family(instance_type: str) -> str:
     if '-' in instance_type:
         x = re.match(r'([A-Za-z]+)([0-9]+)(-)([0-9]+)(.*)', instance_type)
         assert x is not None, x
-        instance_family = x.group(1) + '_' + x.group(5)
+        return f'{x.group(1)}_{x.group(5)}'
     else:
         x = re.match(r'([A-Za-z]+)([0-9]+)(.*)', instance_type)
         assert x is not None, x
-        instance_family = x.group(1) + x.group(3)
-    return instance_family
+        return x.group(1) + x.group(3)
 
 
 def get_default_instance_type(cpus: Optional[str] = None,

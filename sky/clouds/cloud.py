@@ -386,9 +386,7 @@ class Cloud:
     def get_current_user_identity_str(cls) -> Optional[str]:
         """Returns a user friendly representation of the current identity."""
         user_identity = cls.get_current_user_identity()
-        if user_identity is None:
-            return None
-        return ', '.join(user_identity)
+        return None if user_identity is None else ', '.join(user_identity)
 
     def get_credential_file_mounts(self) -> Dict[str, str]:
         """Returns the files necessary to access this cloud.
@@ -464,9 +462,9 @@ class Cloud:
             })
 
         unsupported_features = set(unsupported_features2reason.keys())
-        unsupported_features = requested_features.intersection(
-            unsupported_features)
-        if unsupported_features:
+        if unsupported_features := requested_features.intersection(
+            unsupported_features
+        ):
             table = log_utils.create_table(['Feature', 'Reason'])
             for feature in unsupported_features:
                 table.add_row(
