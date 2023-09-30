@@ -131,11 +131,9 @@ class IBMVPCNodeProvider(NodeProvider):
             # check if current VM is the remote head node
             if self._get_node_type(name) == NODE_KIND_HEAD:
                 logger.debug(f"{name} is HEAD")
-                # pylint: disable=line-too-long
-                node = self.ibm_vpc_client.list_instances(name=name).get_result()[
-                    "instances"
-                ]
-                if node:
+                if node := self.ibm_vpc_client.list_instances(
+                    name=name
+                ).get_result()["instances"]:
                     logger.debug(f"{name} is node in vpc")
 
                     # remote head node will calculate 2 hash values below
@@ -148,8 +146,7 @@ class IBMVPCNodeProvider(NodeProvider):
                     # launch_hash is used to verify the head node belongs
                     # to the cluster. e.g. checked when running --restart-only
                     head_node_config = {}
-                    head_node_type = config.get("head_node_type")
-                    if head_node_type:
+                    if head_node_type := config.get("head_node_type"):
                         head_config = config["available_node_types"][head_node_type]
                         head_node_config.update(head_config["node_config"])
                     launch_hash = hash_launch_conf(head_node_config, config["auth"])
@@ -280,16 +277,15 @@ class IBMVPCNodeProvider(NodeProvider):
             if found_new_node:
                 self.set_node_tags(None, None)
 
-        # if more complex set of filters is specified, there's no use to search
-        # the VPC for them, as this implementation stores tags locally instead
-        # of tagging the instances. instead we'll search the cache nodes_tags
         else:  # match filters specified
             with self.lock:
 
                 for node_id, node_tags in self.nodes_tags.items():
                     # skipping nodes that don't match all specified filters,
                     # i.e. not all items in filters match those in self.nodes_tags
-                    if not all(item in node_tags.items() for item in filters.items()):
+                    if any(
+                        item not in node_tags.items() for item in filters.items()
+                    ):
                         logger.debug(
                             f"specified filters: {filters} don't match node "
                             f"tags: {node_tags}"
@@ -436,8 +432,7 @@ class IBMVPCNodeProvider(NodeProvider):
 
         with self.lock:
             node = self._get_cached_node(node_id)
-            fip = node.get("floating_ips")
-            if fip:
+            if fip := node.get("floating_ips"):
                 return fip[0]["address"]
         return None
 
@@ -531,19 +526,17 @@ class IBMVPCNodeProvider(NodeProvider):
                 key in cluster config file"""
             )
 
-        instance_prototype = {}
-        instance_prototype["name"] = name
-        instance_prototype["keys"] = [key_identity_model]
-        instance_prototype["profile"] = {"name": profile_name}
-        instance_prototype["resource_group"] = {"id": self.resource_group_id}
-        instance_prototype["vpc"] = {"id": self.vpc_tags["vpc_id"]}
-        instance_prototype["image"] = {"id": base_config["image_id"]}
-
-        instance_prototype["zone"] = {"name": self.zone}
-        instance_prototype["boot_volume_attachment"] = boot_volume_attachment
-        # pylint: disable=line-too-long
-        instance_prototype["primary_network_interface"] = primary_network_interface
-
+        instance_prototype = {
+            "name": name,
+            "keys": [key_identity_model],
+            "profile": {"name": profile_name},
+            "resource_group": {"id": self.resource_group_id},
+            "vpc": {"id": self.vpc_tags["vpc_id"]},
+            "image": {"id": base_config["image_id"]},
+            "zone": {"name": self.zone},
+            "boot_volume_attachment": boot_volume_attachment,
+            "primary_network_interface": primary_network_interface,
+        }
         try:
             with self.lock:
                 resp = self.ibm_vpc_client.create_instance(instance_prototype)
@@ -584,14 +577,13 @@ class IBMVPCNodeProvider(NodeProvider):
         floating_ip_name = f"{RAY_RECYCLABLE}-{uuid4().hex[:4]}"
         # create a new floating ip
         logger.debug(f"Creating floating IP {floating_ip_name}")
-        floating_ip_prototype = {}
-        floating_ip_prototype["name"] = floating_ip_name
-        floating_ip_prototype["zone"] = {"name": self.zone}
-        floating_ip_prototype["resource_group"] = {"id": self.resource_group_id}
+        floating_ip_prototype = {
+            "name": floating_ip_name,
+            "zone": {"name": self.zone},
+            "resource_group": {"id": self.resource_group_id},
+        }
         response = self.ibm_vpc_client.create_floating_ip(floating_ip_prototype)
-        floating_ip_data = response.result
-
-        return floating_ip_data
+        return response.result
 
     def _attach_floating_ip(self, instance, fip_data):
         """
@@ -747,8 +739,6 @@ class IBMVPCNodeProvider(NodeProvider):
             )
 
         stopped_nodes_dict = {}
-        futures = []
-
         # Try to reuse previously stopped nodes with compatible configs
         if self.cache_stopped_nodes:
             stopped_nodes = self._stopped_nodes(tags)
@@ -779,10 +769,13 @@ class IBMVPCNodeProvider(NodeProvider):
 
         # create multiple instances concurrently
         if count:
-            with cf.ThreadPoolExecutor(count) as ex:
-                for _ in range(count):
-                    futures.append(ex.submit(self._create_node, base_config, tags))
+            futures = []
 
+            with cf.ThreadPoolExecutor(count) as ex:
+                futures.extend(
+                    ex.submit(self._create_node, base_config, tags)
+                    for _ in range(count)
+                )
             for future in cf.as_completed(futures):
                 created_node = future.result()
                 created_nodes_dict.update(created_node)
@@ -814,7 +807,7 @@ class IBMVPCNodeProvider(NodeProvider):
               for any reason other then "resource not found"
         """
 
-        logger.info("Deleting VM instance {}".format(node_id))
+        logger.info(f"Deleting VM instance {node_id}")
         # avoid fetching data if specified. Skipping this optimization
         # could cause a loop if node is 'failed' since _get_cached_node()
         # would eventually invoke non_terminated_nodes()
@@ -863,13 +856,10 @@ class IBMVPCNodeProvider(NodeProvider):
                 if ip["name"].startswith(RAY_RECYCLABLE):
                     self.ibm_vpc_client.delete_floating_ip(ip["id"])
 
-        # catch exceptions from instance/ip deletion
         except ibm.ibm_cloud_sdk_core.ApiException as e:
             # allow 'resource not found' exceptions to pass through
             # suggesting the resource was already removed
-            if e.code == 404:
-                pass
-            else:
+            if e.code != 404:
                 raise e
 
         # Terminate VPC if node deleted is a head node
@@ -911,9 +901,7 @@ class IBMVPCNodeProvider(NodeProvider):
                 self._delete_node(node_id)
 
         except ibm.ibm_cloud_sdk_core.ApiException as e:
-            if e.code == 404:
-                pass
-            else:
+            if e.code != 404:
                 raise e
 
     def _get_node(self, node_id):
@@ -924,9 +912,8 @@ class IBMVPCNodeProvider(NodeProvider):
 
         if node_id in self.cached_nodes:
             return self.cached_nodes[node_id]
-        else:
-            logger.error(err_msg)
-            raise Exception(err_msg)
+        logger.error(err_msg)
+        raise Exception(err_msg)
 
     def _get_cached_node(self, node_id):
         """Return node info from cache if possible, otherwise fetches it."""

@@ -19,7 +19,7 @@ def main():
     print(content)
     with open(args.output, 'w') as output_file:
         output_file.write(content)
-    print("Output written to {}".format(args.output))
+    print(f"Output written to {args.output}")
 
 
 if __name__ == '__main__':

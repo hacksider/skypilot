@@ -416,7 +416,7 @@ def _handle_signal(job_id):
         # TODO(mraheja): remove pylint disabling when filelock version
         # updated
         # pylint: disable=abstract-class-instantiated
-        with filelock.FileLock(str(signal_file) + '.lock'):
+        with filelock.FileLock(f'{str(signal_file)}.lock'):
             with signal_file.open(mode='r') as f:
                 user_signal = f.read().strip()
                 try:

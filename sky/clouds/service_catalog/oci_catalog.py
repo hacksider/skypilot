@@ -70,11 +70,7 @@ def _get_df() -> 'pd.DataFrame':
                 f'Unexpected exception when handle catalog: {str(e)}')
             subscribed_regions = []
 
-        if subscribed_regions:
-            _df = df[df['Region'].isin(subscribed_regions)]
-        else:
-            _df = df
-
+        _df = df[df['Region'].isin(subscribed_regions)] if subscribed_regions else df
         return _df
 
 

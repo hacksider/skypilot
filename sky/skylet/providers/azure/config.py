@@ -93,13 +93,13 @@ def _configure_resource_group(config):
         unique_id = str(unique_id)
     config["provider"]["unique_id"] = unique_id
     logger.info("Using unique id: %s", unique_id)
-    cluster_id = "{}-{}".format(config["cluster_name"], unique_id)
+    cluster_id = f'{config["cluster_name"]}-{unique_id}'
 
     subnet_mask = config["provider"].get("subnet_mask")
     if subnet_mask is None:
         # choose a random subnet, skipping most common value of 0
         random.seed(unique_id)
-        subnet_mask = "10.{}.0.0/16".format(random.randint(1, 254))
+        subnet_mask = f"10.{random.randint(1, 254)}.0.0/16"
     logger.info("Using subnet mask: %s", subnet_mask)
 
     parameters = {

@@ -125,18 +125,13 @@ class TestOnprem:
     @pytest.fixture
     def admin_cluster_config(self, server_ips, admin_ssh_user, ssh_private_key,
                              local_cluster_name):
-        # Generates a cluster config for the sys admin.
-        yaml_dict = {
-            'cluster': {
-                'ips': server_ips,
-                'name': local_cluster_name
-            },
+        return {
+            'cluster': {'ips': server_ips, 'name': local_cluster_name},
             'auth': {
                 'ssh_user': admin_ssh_user,
-                'ssh_private_key': ssh_private_key
-            }
+                'ssh_private_key': ssh_private_key,
+            },
         }
-        return yaml_dict
 
     @pytest.fixture
     def cluster_config_setup(self, admin_cluster_config, local_cluster_name):
@@ -303,18 +298,15 @@ class TestOnprem:
                 f'sky cancel {first_cluster_name} 2',
                 'sleep 5',
                 f's=$(sky queue {first_cluster_name}); printf "$s"; echo; echo; printf "$s" | grep "^2\\b" | grep CANCELLED',
-                # User 1 should not cancel user 2's jobs.
                 f's=$(sky queue {second_cluster_name}); printf "$s"; echo; echo; printf "$s" | grep "^2\\b" | grep -v CANCELLED',
                 f'sky cancel {second_cluster_name} 2',
-                f'sleep 5',
+                'sleep 5',
                 f's=$(sky queue {second_cluster_name}); printf "$s"; echo; echo; printf "$s" | grep "^2\\b" | grep CANCELLED',
                 f'sky logs {first_cluster_name} 1',
-                f'sky logs {second_cluster_name} 1'
+                f'sky logs {second_cluster_name} 1',
             ],
-            # Cleaning up artifacts created from the test.
-            (f'sky down -y {first_cluster_name} {second_cluster_name}; '
-             f'rm -f ~/.sky/local/{first_cluster_name}.yml; '
-             f'rm -f ~/.sky/local/{second_cluster_name}.yml'))
+            f'sky down -y {first_cluster_name} {second_cluster_name}; rm -f ~/.sky/local/{first_cluster_name}.yml; rm -f ~/.sky/local/{second_cluster_name}.yml',
+        )
         run_one_test(test)
 
     def test_onprem_resource_mismatch(self, local_cluster_name, admin_setup,

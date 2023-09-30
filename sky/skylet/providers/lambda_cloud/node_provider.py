@@ -203,9 +203,7 @@ class LambdaNodeProvider(NodeProvider):
     def node_tags(self, node_id: str) -> Dict[str, str]:
         """Returns the tags of the given node (string dict)."""
         node = self._get_cached_node(node_id=node_id)
-        if node is None:
-            return {}
-        return node['tags']
+        return {} if node is None else node['tags']
 
     def external_ip(self, node_id: str) -> Optional[str]:
         """Returns the external ip of the given node."""
@@ -288,7 +286,7 @@ class LambdaNodeProvider(NodeProvider):
                 for vm in vms:
                     if vm['id'] == vm_id and vm['status'] == 'active':
                         booting_list.remove(vm_id)
-            if len(booting_list) == 0:
+            if not booting_list:
                 return
             time.sleep(10)
 

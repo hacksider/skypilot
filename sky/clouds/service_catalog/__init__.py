@@ -40,9 +40,7 @@ def _map_clouds_catalog(clouds: CloudFilter, method_name: str, *args, **kwargs):
                 f'Module "{cloud}_catalog" does not '
                 f'implement the "{method_name}" method') from None
         results.append(method(*args, **kwargs))
-    if single:
-        return results[0]
-    return results
+    return results[0] if single else results
 
 
 @fallback_to_default_catalog
@@ -97,9 +95,9 @@ def list_accelerator_counts(
         for gpu, items in result.items():
             for item in items:
                 accelerator_counts[gpu].add(item.accelerator_count)
-    ret: Dict[str, List[int]] = {}
-    for gpu, counts in accelerator_counts.items():
-        ret[gpu] = sorted(counts)
+    ret: Dict[str, List[int]] = {
+        gpu: sorted(counts) for gpu, counts in accelerator_counts.items()
+    }
     return ret
 
 

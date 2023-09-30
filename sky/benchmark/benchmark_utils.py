@@ -344,8 +344,9 @@ def _update_benchmark_result(benchmark_result: Dict[str, Any]) -> Optional[str]:
         else:
             benchmark_status = benchmark_state.BenchmarkStatus.TERMINATED
 
-    callback_log_dirs = glob.glob(os.path.join(local_dir, 'sky-callback-*'))
-    if callback_log_dirs:
+    if callback_log_dirs := glob.glob(
+        os.path.join(local_dir, 'sky-callback-*')
+    ):
         # There can be multiple logs if the cluster has executed multiple jobs.
         # Here, we consider the first log as the log of the benchmarking job.
         log_dir = sorted(callback_log_dirs)[0]
@@ -358,10 +359,7 @@ def _update_benchmark_result(benchmark_result: Dict[str, Any]) -> Optional[str]:
         # (1) SkyCallback has saved the summary.
         with open(summary_path, 'r') as f:
             summary = json.load(f)
-        if end_time is None:
-            last_time = summary['last_step_time']
-        else:
-            last_time = end_time
+        last_time = summary['last_step_time'] if end_time is None else end_time
         if last_time is None:
             if job_status == job_lib.JobStatus.RUNNING:
                 last_time = time.time()

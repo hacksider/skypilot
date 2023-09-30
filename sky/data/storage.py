@@ -606,10 +606,14 @@ class Storage(object):
                 # Storage mounting does not support mounting specific files from
                 # cloud store - ensure path points to only a directory
                 if mode == StorageMode.MOUNT:
-                    if ((not split_path.scheme == 'cos' and
-                         split_path.path.strip('/') != '') or
-                        (split_path.scheme == 'cos' and
-                         not re.match(r'^/[-\w]+(/\s*)?$', split_path.path))):
+                    if (
+                        split_path.scheme != 'cos'
+                        and split_path.path.strip('/') != ''
+                        or (
+                            split_path.scheme == 'cos'
+                            and not re.match(r'^/[-\w]+(/\s*)?$', split_path.path)
+                        )
+                    ):
                         # regex allows split_path.path to include /bucket
                         # or /bucket/optional_whitespaces while considering
                         # cos URI's regions (cos://region/bucket_name)
@@ -1091,12 +1095,11 @@ class S3Store(AbstractStore):
                 f'Upload failed for store {self.name}') from e
 
     def delete(self) -> None:
-        deleted_by_skypilot = self._delete_s3_bucket(self.name)
-        if deleted_by_skypilot:
+        if deleted_by_skypilot := self._delete_s3_bucket(self.name):
             msg_str = f'Deleted S3 bucket {self.name}.'
         else:
             msg_str = f'S3 bucket {self.name} may have been deleted ' \
-                      f'externally. Removing from local state.'
+                          f'externally. Removing from local state.'
         logger.info(f'{colorama.Fore.GREEN}{msg_str}'
                     f'{colorama.Style.RESET_ALL}')
 
@@ -1489,12 +1492,11 @@ class GcsStore(AbstractStore):
                 f'Upload failed for store {self.name}') from e
 
     def delete(self) -> None:
-        deleted_by_skypilot = self._delete_gcs_bucket(self.name)
-        if deleted_by_skypilot:
+        if deleted_by_skypilot := self._delete_gcs_bucket(self.name):
             msg_str = f'Deleted GCS bucket {self.name}.'
         else:
             msg_str = f'GCS bucket {self.name} may have been deleted ' \
-                      f'externally. Removing from local state.'
+                          f'externally. Removing from local state.'
         logger.info(f'{colorama.Fore.GREEN}{msg_str}'
                     f'{colorama.Style.RESET_ALL}')
 
@@ -1523,8 +1525,9 @@ class GcsStore(AbstractStore):
         # contents of directory to the root, add /* to the directory path
         # e.g., /mydir/*
         source_path_list = [
-            str(path) + '/*' if
-            (os.path.isdir(path) and not create_dirs) else str(path)
+            f'{str(path)}/*'
+            if (os.path.isdir(path) and not create_dirs)
+            else str(path)
             for path in source_path_list
         ]
         copy_list = '\n'.join(
@@ -1600,10 +1603,11 @@ class GcsStore(AbstractStore):
                 max_concurrent_uploads=_MAX_CONCURRENT_UPLOADS)
 
     def _transfer_to_gcs(self) -> None:
-        if isinstance(self.source, str) and self.source.startswith('s3://'):
-            data_transfer.s3_to_gcs(self.name, self.name)
-        elif isinstance(self.source, str) and self.source.startswith('r2://'):
-            data_transfer.r2_to_gcs(self.name, self.name)
+        if isinstance(self.source, str):
+            if self.source.startswith('s3://'):
+                data_transfer.s3_to_gcs(self.name, self.name)
+            elif self.source.startswith('r2://'):
+                data_transfer.r2_to_gcs(self.name, self.name)
 
     def _get_bucket(self) -> Tuple[StorageHandle, bool]:
         """Obtains the GCS bucket.
@@ -1628,16 +1632,11 @@ class GcsStore(AbstractStore):
                     raise exceptions.StorageBucketGetError(
                         'Attempted to connect to a non-existent bucket: '
                         f'{self.source}') from e
+            elif self.sync_on_reconstruction:
+                bucket = self._create_gcs_bucket(self.name)
+                return bucket, True
             else:
-
-                # If bucket cannot be found (i.e., does not exist), it is to be
-                # created by Sky. However, creation is skipped if Store object
-                # is being reconstructed for deletion.
-                if self.sync_on_reconstruction:
-                    bucket = self._create_gcs_bucket(self.name)
-                    return bucket, True
-                else:
-                    return None, False
+                return None, False
         except gcp.forbidden_exception():
             # Try public bucket to see if bucket exists
             logger.info(
@@ -1850,9 +1849,7 @@ class R2Store(AbstractStore):
                     self._transfer_to_r2()
                 elif self.source.startswith('gs://'):
                     self._transfer_to_r2()
-                elif self.source.startswith('r2://'):
-                    pass
-                else:
+                elif not self.source.startswith('r2://'):
                     self.batch_aws_rsync([self.source])
         except exceptions.StorageUploadError:
             raise
@@ -1861,12 +1858,11 @@ class R2Store(AbstractStore):
                 f'Upload failed for store {self.name}') from e
 
     def delete(self) -> None:
-        deleted_by_skypilot = self._delete_r2_bucket(self.name)
-        if deleted_by_skypilot:
+        if deleted_by_skypilot := self._delete_r2_bucket(self.name):
             msg_str = f'Deleted R2 bucket {self.name}.'
         else:
             msg_str = f'R2 bucket {self.name} may have been deleted ' \
-                      f'externally. Removing from local state.'
+                          f'externally. Removing from local state.'
         logger.info(f'{colorama.Fore.GREEN}{msg_str}'
                     f'{colorama.Style.RESET_ALL}')
 

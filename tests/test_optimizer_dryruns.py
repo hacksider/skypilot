@@ -123,7 +123,6 @@ def _test_resources_launch(monkeypatch,
         task = sky.Task('test_task')
         task.set_resources({resources})
     sky.launch(dag, dryrun=True, cluster_name=cluster_name)
-    assert True
 
 
 def test_resources_aws(monkeypatch):

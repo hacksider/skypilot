@@ -87,8 +87,10 @@ def _log_start_end(func):
 def _hint_worker_log_path(cluster_name: str, cluster_info: common.ClusterInfo,
                           stage_name: str):
     if len(cluster_info.instances) > 1:
-        worker_log_path = metadata_utils.get_instance_log_dir(
-            cluster_name, '*') / (stage_name + '.log')
+        worker_log_path = (
+            metadata_utils.get_instance_log_dir(cluster_name, '*')
+            / f'{stage_name}.log'
+        )
         logger.info(f'Logs of worker nodes can be found at: {worker_log_path}')
 
 
@@ -109,7 +111,7 @@ def _parallel_ssh_with_cache(func, cluster_name: str, stage_name: str,
             else:
                 log_dir_abs = metadata_utils.get_instance_log_dir(
                     cluster_name, instance_id)
-                log_path_abs = str(log_dir_abs / (stage_name + '.log'))
+                log_path_abs = str(log_dir_abs / f'{stage_name}.log')
             results.append(
                 pool.submit(wrapper(func), runner, metadata, log_path_abs))
 
@@ -279,7 +281,7 @@ def start_ray_on_worker_nodes(cluster_name: str, no_restart: bool,
                f'grep "gcs-address={head_private_ip}:${{RAY_PORT}}" || '
                f'{{ {cmd}; }}')
     else:
-        cmd = 'ray stop; ' + cmd
+        cmd = f'ray stop; {cmd}'
 
     logger.info(f'Running command on worker nodes: {cmd}')
 

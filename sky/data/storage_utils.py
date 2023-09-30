@@ -56,10 +56,7 @@ def format_storage_table(storages: List[Dict[str, Any]],
             # STATUS
             row['status'].value,
         ])
-    if storages:
-        return str(storage_table)
-    else:
-        return 'No existing storage.'
+    return str(storage_table) if storages else 'No existing storage.'
 
 
 def get_excluded_files_from_gitignore(src_dir_path: str) -> List[str]:

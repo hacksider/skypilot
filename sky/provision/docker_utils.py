@@ -82,9 +82,7 @@ def docker_start_cmds(
     docker_run = [
         docker_cmd,
         'run',
-        # SkyPilot: Remove --rm flag to keep the container after `ray stop`
-        # is executed.
-        '--name {}'.format(container_name),
+        f'--name {container_name}',
         '-d',
         '-it',
         env_flags,
@@ -181,8 +179,7 @@ class DockerInitializer:
 
         logger.info(f'Starting container {self.container_name} with image '
                     f'{specific_image}')
-        container_running = self._check_container_status()
-        if container_running:
+        if container_running := self._check_container_status():
             running_image = (self._run(
                 check_docker_image(self.container_name, self.docker_cmd)))
             if running_image != specific_image:
@@ -284,9 +281,9 @@ class DockerInitializer:
                     'printenv HOME',))
 
             if any_char:
-                return string.replace('~/', self.home_dir + '/')
+                return string.replace('~/', f'{self.home_dir}/')
 
-            elif not any_char and user_pos == 0:
+            elif user_pos == 0:
                 return string.replace('~', self.home_dir, 1)
 
         return string

@@ -38,11 +38,9 @@ def cache_func(cluster_name: str, instance_id: str, stage_name: str,
         @functools.wraps(function)
         def wrapper(*args, **kwargs):
             with check_cache_hash_or_update(cluster_name, instance_id,
-                                            stage_name,
-                                            hash_str) as need_update:
-                if need_update:
-                    return function(*args, **kwargs)
-                return None
+                                                        stage_name,
+                                                        hash_str) as need_update:
+                return function(*args, **kwargs) if need_update else None
 
         return wrapper
 

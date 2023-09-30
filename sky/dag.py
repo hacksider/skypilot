@@ -56,15 +56,16 @@ class Dag:
         visited_zero_out_degree = False
         for node in self.graph.nodes:
             out_degree = self.graph.out_degree(node)
-            if out_degree > 1:
+            if (
+                out_degree <= 1
+                and out_degree == 0
+                and visited_zero_out_degree
+                or out_degree > 1
+            ):
                 is_chain = False
                 break
             elif out_degree == 0:
-                if visited_zero_out_degree:
-                    is_chain = False
-                    break
-                else:
-                    visited_zero_out_degree = True
+                visited_zero_out_degree = True
         return is_chain
 
 
@@ -80,10 +81,7 @@ class _DagContext(threading.local):
 
     def pop_dag(self):
         old_dag = self._current_dag
-        if self._previous_dags:
-            self._current_dag = self._previous_dags.pop()
-        else:
-            self._current_dag = None
+        self._current_dag = self._previous_dags.pop() if self._previous_dags else None
         return old_dag
 
     def get_current_dag(self) -> Optional[Dag]:

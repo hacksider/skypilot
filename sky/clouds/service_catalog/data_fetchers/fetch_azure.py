@@ -46,12 +46,11 @@ def get_regions() -> List[str]:
         check=True,
         stdout=subprocess.PIPE)
     items = json.loads(proc.stdout.decode('utf-8'))
-    regions = [
+    return [
         item['RegionName']
         for item in items
         if not item['RegionName'].endswith('stg')
     ]
-    return regions
 
 
 # Azure secretly deprecated the M60 family which is still returned by its API.
@@ -120,8 +119,7 @@ def get_sku_df(region_set: Set[str]) -> pd.DataFrame:
         item['Region'] = region
         filtered_items.append(item)
 
-    df = pd.DataFrame(filtered_items)
-    return df
+    return pd.DataFrame(filtered_items)
 
 
 def get_gpu_name(family: str) -> Optional[str]:

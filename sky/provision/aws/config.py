@@ -1,4 +1,5 @@
 """AWS configuration bootstrapping."""
+
 # The codes are adapted from
 # https://github.com/ray-project/ray/tree/ray-2.0.1/python/ray/autoscaler/_private/aws/config.py
 # Git commit of the release 2.0.1: 03b6bc7b5a305877501110ec04710a9c57011479
@@ -21,8 +22,8 @@ RAY = 'ray-autoscaler'
 SECURITY_GROUP_TEMPLATE = RAY + '-{}'
 
 SKYPILOT = 'skypilot'
-DEFAULT_SKYPILOT_INSTANCE_PROFILE = SKYPILOT + '-v1'
-DEFAULT_SKYPILOT_IAM_ROLE = SKYPILOT + '-v1'
+DEFAULT_SKYPILOT_INSTANCE_PROFILE = f'{SKYPILOT}-v1'
+DEFAULT_SKYPILOT_IAM_ROLE = f'{SKYPILOT}-v1'
 
 # Suppress excessive connection dropped logs from boto
 logging.getLogger('botocore').setLevel(logging.WARNING)
@@ -119,12 +120,11 @@ def _configure_iam_role(iam) -> Dict[str, Any]:
         except aws.botocore_exceptions().ClientError as exc:
             if exc.response.get('Error', {}).get('Code') == 'NoSuchEntity':
                 return None
-            else:
-                utils.handle_boto_error(
-                    exc, 'Failed to fetch IAM instance profile data for '
-                    f'{colorama.Style.BRIGHT}{profile_name}'
-                    f'{colorama.Style.RESET_ALL} from AWS.')
-                raise exc
+            utils.handle_boto_error(
+                exc, 'Failed to fetch IAM instance profile data for '
+                f'{colorama.Style.BRIGHT}{profile_name}'
+                f'{colorama.Style.RESET_ALL} from AWS.')
+            raise exc
 
     def _get_role(role_name: str):
         role = iam.Role(role_name)
@@ -134,12 +134,11 @@ def _configure_iam_role(iam) -> Dict[str, Any]:
         except aws.botocore_exceptions().ClientError as exc:
             if exc.response.get('Error', {}).get('Code') == 'NoSuchEntity':
                 return None
-            else:
-                utils.handle_boto_error(
-                    exc,
-                    f'Failed to fetch IAM role data for {colorama.Style.BRIGHT}'
-                    f'{role_name}{colorama.Style.RESET_ALL} from AWS.')
-                raise exc
+            utils.handle_boto_error(
+                exc,
+                f'Failed to fetch IAM role data for {colorama.Style.BRIGHT}'
+                f'{role_name}{colorama.Style.RESET_ALL} from AWS.')
+            raise exc
 
     instance_profile_name = DEFAULT_SKYPILOT_INSTANCE_PROFILE
     profile = _get_instance_profile(instance_profile_name)
@@ -358,7 +357,7 @@ def _vpc_id_from_security_group_ids(ec2, sg_ids: List[str]) -> Any:
 
     no_sg_msg = ('Failed to detect a security group with id equal to any of '
                  'the configured SecurityGroupIds.')
-    assert len(vpc_ids) > 0, no_sg_msg
+    assert vpc_ids, no_sg_msg
 
     return vpc_ids[0]
 
@@ -510,7 +509,6 @@ def _get_security_groups_from_vpc_ids(ec2, vpc_ids: List[str],
             'Name': 'vpc-id',
             'Values': unique_vpc_ids
         }]))
-    filtered_groups = [
+    return [
         sg for sg in existing_groups if sg.group_name in unique_group_names
     ]
-    return filtered_groups

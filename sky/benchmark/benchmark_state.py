@@ -172,13 +172,12 @@ def get_benchmark_from_name(benchmark_name: str) -> Optional[Dict[str, Any]]:
     rows = _BENCHMARK_DB.cursor.execute(
         'SELECT * FROM benchmark WHERE name=(?)', (benchmark_name,))
     for name, task, bucket, launched_at in rows:
-        record = {
+        return {
             'name': name,
             'task': task,
             'bucket': bucket,
             'launched_at': launched_at,
         }
-        return record
 
 
 def get_benchmarks() -> List[Dict[str, Any]]:

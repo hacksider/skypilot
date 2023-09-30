@@ -490,8 +490,7 @@ def get_nonterminal_job_ids_by_name(name: Optional[str]) -> List[int]:
             ({statuses})
             {name_filter}
             ORDER BY spot.spot_job_id DESC""", field_values).fetchall()
-        job_ids = [row[0] for row in rows if row[0] is not None]
-        return job_ids
+        return [row[0] for row in rows if row[0] is not None]
 
 
 def _get_all_task_ids_statuses(job_id: int) -> List[Tuple[int, SpotStatus]]:
@@ -546,9 +545,7 @@ def get_failure_reason(job_id: int) -> Optional[str]:
             WHERE spot_job_id=(?)
             ORDER BY task_id ASC""", (job_id,)).fetchall()
         reason = [r[0] for r in reason if r[0] is not None]
-        if len(reason) == 0:
-            return None
-        return reason[0]
+        return None if not reason else reason[0]
 
 
 def get_spot_jobs(job_id: Optional[int] = None) -> List[Dict[str, Any]]:

@@ -396,8 +396,7 @@ class Azure(clouds.Cloud):
         # `az account show` does not guarantee this file exists.
         azure_token_cache_file = '~/.azure/msal_token_cache.json'
         if not os.path.isfile(os.path.expanduser(azure_token_cache_file)):
-            return (False,
-                    f'{azure_token_cache_file} does not exist.' + help_str)
+            return False, f'{azure_token_cache_file} does not exist.{help_str}'
 
         try:
             _run_output('az --version')
@@ -488,9 +487,7 @@ class Azure(clouds.Cloud):
     @classmethod
     def get_current_user_identity_str(cls) -> Optional[str]:
         user_identity = cls.get_current_user_identity()
-        if user_identity is None:
-            return None
-        return user_identity[0]
+        return None if user_identity is None else user_identity[0]
 
     @classmethod
     def get_project_id(cls, dryrun: bool = False) -> str:
@@ -601,9 +598,7 @@ class Azure(clouds.Cloud):
             node_ids = json.loads(stdout.strip())
             if not node_ids:
                 return []
-            state_str = '[].powerState'
-            if len(node_ids) == 1:
-                state_str = 'powerState'
+            state_str = 'powerState' if len(node_ids) == 1 else '[].powerState'
             node_ids_str = '\t'.join(node_ids)
             query_cmd = (
                 f'az vm show -d --ids {node_ids_str} --query "{state_str}" -o json'

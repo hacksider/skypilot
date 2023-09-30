@@ -303,18 +303,17 @@ class GCPResource(metaclass=abc.ABCMeta):
         """
         operations = [
             self.create_instance(base_config, labels, wait_for_operation=False)
-            for i in range(count)
+            for _ in range(count)
         ]
 
-        if wait_for_operation:
-            results = [
+        return (
+            [
                 (self.wait_for_operation(operation), node_name)
                 for operation, node_name in operations
             ]
-        else:
-            results = operations
-
-        return results
+            if wait_for_operation
+            else operations
+        )
 
     @abc.abstractmethod
     def start_instance(self, node_id: str, wait_for_operation: bool = True) -> dict:
@@ -379,9 +378,7 @@ class GCPCompute(GCPResource):
     def _list_instances(
         self, label_filters: Optional[dict], status_filter: Optional[List[str]]
     ) -> List[GCPComputeNode]:
-        label_filters = label_filters or {}
-
-        if label_filters:
+        if label_filters := label_filters or {}:
             label_filter_expr = (
                 "("
                 + " AND ".join(
@@ -470,12 +467,7 @@ class GCPCompute(GCPResource):
             .execute()
         )
 
-        if wait_for_operation:
-            result = self.wait_for_operation(operation)
-        else:
-            result = operation
-
-        return result
+        return self.wait_for_operation(operation) if wait_for_operation else operation
 
     def _convert_resources_to_urls(
         self, configuration_dict: Dict[str, Any]
@@ -578,12 +570,7 @@ class GCPCompute(GCPResource):
             .execute()
         )
 
-        if wait_for_operation:
-            result = self.wait_for_operation(operation)
-        else:
-            result = operation
-
-        return result
+        return self.wait_for_operation(operation) if wait_for_operation else operation
 
     def stop_instance(self, node_id: str, wait_for_operation: bool = True) -> dict:
         operation = (
@@ -596,12 +583,7 @@ class GCPCompute(GCPResource):
             .execute()
         )
 
-        if wait_for_operation:
-            result = self.wait_for_operation(operation)
-        else:
-            result = operation
-
-        return result
+        return self.wait_for_operation(operation) if wait_for_operation else operation
 
     def delete_instance(self, node_id: str, wait_for_operation: bool = True) -> dict:
         operation = (
@@ -614,12 +596,7 @@ class GCPCompute(GCPResource):
             .execute()
         )
 
-        if wait_for_operation:
-            result = self.wait_for_operation(operation)
-        else:
-            result = operation
-
-        return result
+        return self.wait_for_operation(operation) if wait_for_operation else operation
 
 
 class GCPTPU(GCPResource):
@@ -747,12 +724,7 @@ class GCPTPU(GCPResource):
             .execute()
         )
 
-        if wait_for_operation:
-            result = self.wait_for_operation(operation)
-        else:
-            result = operation
-
-        return result
+        return self.wait_for_operation(operation) if wait_for_operation else operation
 
     def create_instance(
         self, base_config: dict, labels: dict, wait_for_operation: bool = True
@@ -764,11 +736,7 @@ class GCPTPU(GCPResource):
 
         labels = dict(config.get("labels", {}), **labels)
 
-        config.update(
-            {
-                "labels": dict(labels, **{TAG_RAY_CLUSTER_NAME: self.cluster_name}),
-            }
-        )
+        config["labels"] = dict(labels, **{TAG_RAY_CLUSTER_NAME: self.cluster_name})
 
         if "networkConfig" not in config:
             config["networkConfig"] = {}
@@ -806,36 +774,30 @@ class GCPTPU(GCPResource):
             self.resource.projects().locations().nodes().start(name=node_id).execute()
         )
 
-        # No need to increase MAX_POLLS for deletion
-        if wait_for_operation:
-            result = self.wait_for_operation(operation, max_polls=MAX_POLLS)
-        else:
-            result = operation
-
-        return result
+        return (
+            self.wait_for_operation(operation, max_polls=MAX_POLLS)
+            if wait_for_operation
+            else operation
+        )
 
     def stop_instance(self, node_id: str, wait_for_operation: bool = True) -> dict:
         operation = (
             self.resource.projects().locations().nodes().stop(name=node_id).execute()
         )
 
-        # No need to increase MAX_POLLS for deletion
-        if wait_for_operation:
-            result = self.wait_for_operation(operation, max_polls=MAX_POLLS)
-        else:
-            result = operation
-
-        return result
+        return (
+            self.wait_for_operation(operation, max_polls=MAX_POLLS)
+            if wait_for_operation
+            else operation
+        )
 
     def delete_instance(self, node_id: str, wait_for_operation: bool = True) -> dict:
         operation = (
             self.resource.projects().locations().nodes().delete(name=node_id).execute()
         )
 
-        # No need to increase MAX_POLLS for deletion
-        if wait_for_operation:
-            result = self.wait_for_operation(operation, max_polls=MAX_POLLS)
-        else:
-            result = operation
-
-        return result
+        return (
+            self.wait_for_operation(operation, max_polls=MAX_POLLS)
+            if wait_for_operation
+            else operation
+        )

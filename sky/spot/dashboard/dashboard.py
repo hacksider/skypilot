@@ -60,13 +60,12 @@ def home():
     # Remove filler rows ([''], ..., ['-']).
     rows = [row for row in rows if ''.join(map(str, row)) != '']
 
-    rendered_html = flask.render_template(
+    return flask.render_template(
         'index.html',
         columns=columns,
         rows=rows,
         last_updated_timestamp=timestamp,
     )
-    return rendered_html
 
 
 if __name__ == '__main__':

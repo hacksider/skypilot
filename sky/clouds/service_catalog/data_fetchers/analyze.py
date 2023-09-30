@@ -27,21 +27,17 @@ CLOUD_CHECKS = {
 
 table = {}
 
-for cloud in CLOUD_CHECKS:
-    result = {}
+for cloud, current_check_tuple in CLOUD_CHECKS.items():
     print(f'=> Checking {cloud}')
     original_catalog_df = common.read_catalog(f'{cloud}.csv')
     new_catalog_df = pd.read_csv(f'{cloud}.csv')
-
-    current_check_tuple = CLOUD_CHECKS[cloud]
 
     resource_diff_df = resource_diff(original_catalog_df, new_catalog_df,
                                      current_check_tuple)
     resource_diff_df.merge(new_catalog_df, on=current_check_tuple,
                            how='left').to_csv(f'{cloud}_diff.csv', index=False)
 
-    result['#resources'] = len(resource_diff_df)
-
+    result = {'#resources': len(resource_diff_df)}
     check_price = current_check_tuple + ['Price']
     price_diff_df = resource_diff(original_catalog_df, new_catalog_df,
                                   check_price)

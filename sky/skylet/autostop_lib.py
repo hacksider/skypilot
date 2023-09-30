@@ -86,9 +86,7 @@ def get_is_autostopping_payload() -> str:
 def get_last_active_time() -> float:
     """Returns the last active time, or -1 if none has been set."""
     result = configs.get_config(_AUTOSTOP_LAST_ACTIVE_TIME)
-    if result is not None:
-        return float(result)
-    return -1
+    return float(result) if result is not None else -1
 
 
 def set_last_active_time_to_now() -> None:

@@ -326,10 +326,9 @@ def _interactive_node_cli_command(cli_func):
         disk_tier,
         ports,
     ]
-    decorator = functools.reduce(lambda res, f: f(res),
-                                 reversed(click_decorators), cli_func)
-
-    return decorator
+    return functools.reduce(
+        lambda res, f: f(res), reversed(click_decorators), cli_func
+    )
 
 
 def _parse_env_var(env_var: str) -> Tuple[str, str]:
@@ -533,10 +532,10 @@ def _install_shell_completion(ctx: click.Context, param: click.Parameter,
             value = os.path.basename(os.environ['SHELL'])
 
     zshrc_diff = '\n# For SkyPilot shell completion\n. ~/.sky/.sky-complete.zsh'
-    bashrc_diff = ('\n# For SkyPilot shell completion'
-                   '\n. ~/.sky/.sky-complete.bash')
-
     if value == 'bash':
+        bashrc_diff = ('\n# For SkyPilot shell completion'
+                       '\n. ~/.sky/.sky-complete.bash')
+
         install_cmd = f'_SKY_COMPLETE=bash_source sky > \
                 ~/.sky/.sky-complete.bash && \
                 echo "{bashrc_diff}" >> ~/.bashrc'
@@ -655,30 +654,15 @@ def _parse_override_params(
         else:
             override_params['cloud'] = clouds.CLOUD_REGISTRY.from_str(cloud)
     if region is not None:
-        if region.lower() == 'none':
-            override_params['region'] = None
-        else:
-            override_params['region'] = region
+        override_params['region'] = None if region.lower() == 'none' else region
     if zone is not None:
-        if zone.lower() == 'none':
-            override_params['zone'] = None
-        else:
-            override_params['zone'] = zone
+        override_params['zone'] = None if zone.lower() == 'none' else zone
     if gpus is not None:
-        if gpus.lower() == 'none':
-            override_params['accelerators'] = None
-        else:
-            override_params['accelerators'] = gpus
+        override_params['accelerators'] = None if gpus.lower() == 'none' else gpus
     if cpus is not None:
-        if cpus.lower() == 'none':
-            override_params['cpus'] = None
-        else:
-            override_params['cpus'] = cpus
+        override_params['cpus'] = None if cpus.lower() == 'none' else cpus
     if memory is not None:
-        if memory.lower() == 'none':
-            override_params['memory'] = None
-        else:
-            override_params['memory'] = memory
+        override_params['memory'] = None if memory.lower() == 'none' else memory
     if instance_type is not None:
         if instance_type.lower() == 'none':
             override_params['instance_type'] = None
@@ -687,10 +671,7 @@ def _parse_override_params(
     if use_spot is not None:
         override_params['use_spot'] = use_spot
     if image_id is not None:
-        if image_id.lower() == 'none':
-            override_params['image_id'] = None
-        else:
-            override_params['image_id'] = image_id
+        override_params['image_id'] = None if image_id.lower() == 'none' else image_id
     if disk_size is not None:
         override_params['disk_size'] = disk_size
     if disk_tier is not None:
@@ -711,16 +692,13 @@ def _default_interactive_node_name(node_type: str):
 
 def _infer_interactive_node_type(resources: sky.Resources):
     """Determine interactive node type from resources."""
-    accelerators = resources.accelerators
     cloud = resources.cloud
-    if accelerators:
+    if accelerators := resources.accelerators:
         # We only support homogenous accelerators for now.
         assert len(accelerators) == 1, resources
         acc, _ = list(accelerators.items())[0]
         is_gcp = cloud is not None and cloud.is_same_cloud(sky.GCP())
-        if is_gcp and 'tpu' in acc:
-            return 'tpunode'
-        return 'gpunode'
+        return 'tpunode' if is_gcp and 'tpu' in acc else 'gpunode'
     return 'cpunode'
 
 
@@ -1001,13 +979,7 @@ def _check_yaml(entrypoint: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
     try:
         with open(entrypoint, 'r') as f:
             try:
-                config = list(yaml.safe_load_all(f))
-                if config:
-                    # FIXME(zongheng): in a chain DAG YAML it only returns the
-                    # first section. OK for downstream but is weird.
-                    result = config[0]
-                else:
-                    result = {}
+                result = config[0] if (config := list(yaml.safe_load_all(f))) else {}
                 if isinstance(result, str):
                     # 'sky exec cluster ./my_script.sh'
                     is_yaml = False
@@ -1030,8 +1002,8 @@ def _check_yaml(entrypoint: str) -> Tuple[bool, Optional[Dict[str, Any]]]:
                 invalid_reason = ('yaml.safe_load() failed. Please check if the'
                                   ' path is correct.')
         is_yaml = False
-    if not is_yaml:
-        if yaml_file_provided:
+    if yaml_file_provided:
+        if not is_yaml:
             click.confirm(
                 f'{entrypoint!r} looks like a yaml path but {invalid_reason}\n'
                 'It will be treated as a command to be run remotely. Continue?',
@@ -1075,14 +1047,13 @@ def _make_task_or_dag_from_entrypoint_with_overrides(
         # Treat entrypoint as a yaml.
         click.secho('Task from YAML spec: ', fg='yellow', nl=False)
         click.secho(entrypoint, bold=True)
-    else:
-        if not entrypoint:
-            entrypoint = None
-        else:
-            # Treat entrypoint as a bash command.
-            click.secho('Task from command: ', fg='yellow', nl=False)
-            click.secho(entrypoint, bold=True)
+    elif entrypoint:
+        # Treat entrypoint as a bash command.
+        click.secho('Task from command: ', fg='yellow', nl=False)
+        click.secho(entrypoint, bold=True)
 
+    else:
+        entrypoint = None
     if onprem_utils.check_local_cloud_args(cloud, cluster, yaml_config):
         cloud = 'local'
 
@@ -1683,7 +1654,6 @@ def _get_spot_jobs(
                 nargs=-1,
                 **_get_shell_complete_args(_complete_cluster_name))
 @usage_lib.entrypoint
-# pylint: disable=redefined-builtin
 def status(all: bool, refresh: bool, ip: bool, show_spot_jobs: bool,
            clusters: List[str]):
     # NOTE(dev): Keep the docstring consistent between the Python API and CLI.
@@ -1754,8 +1724,7 @@ def status(all: bool, refresh: bool, ip: bool, show_spot_jobs: bool,
             if len(clusters) != 1:
                 with ux_utils.print_exception_no_traceback():
                     plural = 's' if len(clusters) > 1 else ''
-                    cluster_num = (str(len(clusters))
-                                   if len(clusters) > 0 else 'No')
+                    cluster_num = str(len(clusters)) if clusters else 'No'
                     raise ValueError(
                         _STATUS_IP_CLUSTER_NUM_ERROR_MESSAGE.format(
                             cluster_num=cluster_num,
@@ -1764,17 +1733,14 @@ def status(all: bool, refresh: bool, ip: bool, show_spot_jobs: bool,
         else:
             click.echo(f'{colorama.Fore.CYAN}{colorama.Style.BRIGHT}Clusters'
                        f'{colorama.Style.RESET_ALL}')
-        query_clusters: Optional[List[str]] = None
-        if clusters:
-            query_clusters = _get_glob_clusters(clusters, silent=ip)
+        query_clusters = _get_glob_clusters(clusters, silent=ip) if clusters else None
         cluster_records = core.status(cluster_names=query_clusters,
                                       refresh=refresh)
         if ip:
             if len(cluster_records) != 1:
                 with ux_utils.print_exception_no_traceback():
                     plural = 's' if len(cluster_records) > 1 else ''
-                    cluster_num = (str(len(cluster_records))
-                                   if len(clusters) > 0 else 'No')
+                    cluster_num = str(len(cluster_records)) if clusters else 'No'
                     raise ValueError(
                         _STATUS_IP_CLUSTER_NUM_ERROR_MESSAGE.format(
                             cluster_num=cluster_num,
@@ -1856,11 +1822,7 @@ def status(all: bool, refresh: bool, ip: bool, show_spot_jobs: bool,
                     f'sky spot queue{colorama.Style.RESET_ALL}')
 
         if num_pending_autostop > 0 and not refresh:
-            # Don't print this hint if there's no pending autostop or user has
-            # already passed --refresh.
-            plural_and_verb = ' has'
-            if num_pending_autostop > 1:
-                plural_and_verb = 's have'
+            plural_and_verb = 's have' if num_pending_autostop > 1 else ' has'
             hints.append(f'* {num_pending_autostop} cluster{plural_and_verb} '
                          'auto{stop,down} scheduled. Refresh statuses with: '
                          f'{colorama.Style.BRIGHT}sky status --refresh'
@@ -1877,7 +1839,7 @@ def status(all: bool, refresh: bool, ip: bool, show_spot_jobs: bool,
               required=False,
               help='Show all information in full.')
 @usage_lib.entrypoint
-def cost_report(all: bool):  # pylint: disable=redefined-builtin
+def cost_report(all: bool):    # pylint: disable=redefined-builtin
     # NOTE(dev): Keep the docstring consistent between the Python API and CLI.
     """Show estimated costs for launched clusters.
 
@@ -1899,7 +1861,7 @@ def cost_report(all: bool):  # pylint: disable=redefined-builtin
     cluster_records = core.cost_report()
 
     nonreserved_cluster_records = []
-    reserved_clusters = dict()
+    reserved_clusters = {}
     for cluster_record in cluster_records:
         cluster_name = cluster_record['name']
         if cluster_name in backend_utils.SKY_RESERVED_CLUSTER_NAMES:
@@ -2028,7 +1990,6 @@ def queue(clusters: List[str], skip_finished: bool, all_users: bool):
                 type=str,
                 **_get_shell_complete_args(_complete_cluster_name))
 @click.argument('job_ids', type=str, nargs=-1)
-# TODO(zhwu): support logs by job name
 @usage_lib.entrypoint
 def logs(
     cluster: str,
@@ -2084,11 +2045,10 @@ def logs(
         click.echo(f'Job {job_id}: {job_status_str}')
         if job_status == job_lib.JobStatus.SUCCEEDED:
             return
-        else:
-            if job_status is None:
-                id_str = '' if job_id is None else f'{job_id} '
-                click.secho(f'Job {id_str}not found', fg='red')
-            sys.exit(1)
+        if job_status is None:
+            id_str = '' if job_id is None else f'{job_id} '
+            click.secho(f'Job {id_str}not found', fg='red')
+        sys.exit(1)
 
     core.tail_logs(cluster, job_id, follow)
 
@@ -2112,7 +2072,7 @@ def logs(
               help='Skip confirmation prompt.')
 @click.argument('jobs', required=False, type=int, nargs=-1)
 @usage_lib.entrypoint
-def cancel(cluster: str, all: bool, jobs: List[int], yes: bool):  # pylint: disable=redefined-builtin
+def cancel(cluster: str, all: bool, jobs: List[int], yes: bool):    # pylint: disable=redefined-builtin
     # NOTE(dev): Keep the docstring consistent between the Python API and CLI.
     """Cancel job(s).
 
@@ -2137,20 +2097,20 @@ def cancel(cluster: str, all: bool, jobs: List[int], yes: bool):  # pylint: disa
     reset = colorama.Style.RESET_ALL
     job_identity_str = None
     job_ids_to_cancel = None
-    if not jobs and not all:
-        click.echo(f'{colorama.Fore.YELLOW}No job IDs or --all provided; '
-                   'cancelling the latest running job.'
-                   f'{colorama.Style.RESET_ALL}')
-        job_identity_str = 'the latest running job'
-    else:
+    if jobs or all:
         # Cancelling specific jobs or --all.
         job_ids = ' '.join(map(str, jobs))
         plural = 's' if len(job_ids) > 1 else ''
         job_identity_str = f'job{plural} {job_ids}'
         job_ids_to_cancel = jobs
-        if all:
-            job_identity_str = 'all jobs'
-            job_ids_to_cancel = None
+    else:
+        click.echo(f'{colorama.Fore.YELLOW}No job IDs or --all provided; '
+                   'cancelling the latest running job.'
+                   f'{colorama.Style.RESET_ALL}')
+        job_identity_str = 'the latest running job'
+    if all:
+        job_identity_str = 'all jobs'
+        job_ids_to_cancel = None
     job_identity_str += f' on cluster {cluster!r}'
 
     if not yes:
@@ -2397,7 +2357,6 @@ def autostop(
     help=('Force start the cluster even if it is already UP. Useful for '
           'upgrading the SkyPilot runtime on the cluster.'))
 @usage_lib.entrypoint
-# pylint: disable=redefined-builtin
 def start(
         clusters: List[str],
         all: bool,
@@ -2531,18 +2490,18 @@ def start(
             reserved.append(name)
         else:
             non_reserved.append(name)
-    if reserved and non_reserved:
-        assert len(reserved) == 1, reserved
-        # Keep this behavior the same as _down_or_stop_clusters().
-        raise click.UsageError(
-            'Starting the spot controller with other cluster(s) '
-            'is currently not supported.\n'
-            'Please start the former independently.')
     if reserved:
+        if non_reserved:
+            assert len(reserved) == 1, reserved
+            # Keep this behavior the same as _down_or_stop_clusters().
+            raise click.UsageError(
+                'Starting the spot controller with other cluster(s) '
+                'is currently not supported.\n'
+                'Please start the former independently.')
         assert len(reserved) == 1, reserved
-        bold = backend_utils.BOLD
-        reset_bold = backend_utils.RESET_BOLD
         if idle_minutes_to_autostop is not None:
+            bold = backend_utils.BOLD
+            reset_bold = backend_utils.RESET_BOLD
             raise click.UsageError(
                 'Autostop options are currently not allowed when starting the '
                 'spot controller. Use the default autostop settings by directly'
@@ -2693,7 +2652,8 @@ def _hint_or_raise_for_down_spot_controller(controller_name: str):
                    f'{colorama.Style.RESET_ALL}\n')
             # Add prefix to each line to align with the bullet point.
             msg += '\n'.join(
-                ['   ' + line for line in job_table.split('\n') if line != ''])
+                [f'   {line}' for line in job_table.split('\n') if line != '']
+            )
             with ux_utils.print_exception_no_traceback():
                 raise exceptions.NotSupportedError(msg)
         else:
@@ -2764,8 +2724,8 @@ def _down_or_stop_clusters(
             ]
         # Make sure the reserved clusters are explicitly specified without other
         # normal clusters.
-        if len(reserved_clusters) > 0:
-            if len(names) != 0:
+        if reserved_clusters:
+            if names:
                 names_str = ', '.join(map(repr, names))
                 raise click.UsageError(
                     f'{operation} reserved cluster(s) '
@@ -2777,20 +2737,19 @@ def _down_or_stop_clusters(
                     f'{operation} reserved cluster(s) '
                     f'{reserved_clusters_str} is currently not supported. '
                     'It will be auto-stopped after all spot jobs finish.')
-            else:
-                # TODO(zhwu): We can only have one reserved cluster (spot
-                # controller).
-                assert len(reserved_clusters) == 1, reserved_clusters
-                _hint_or_raise_for_down_spot_controller(reserved_clusters[0])
-                confirm_str = 'delete'
-                user_input = click.prompt(
-                    f'To proceed, please check the warning above and type '
-                    f'{colorama.Style.BRIGHT}{confirm_str!r}'
-                    f'{colorama.Style.RESET_ALL}',
-                    type=str)
-                if user_input != confirm_str:
-                    raise click.Abort()
-                no_confirm = True
+            # TODO(zhwu): We can only have one reserved cluster (spot
+            # controller).
+            assert len(reserved_clusters) == 1, reserved_clusters
+            _hint_or_raise_for_down_spot_controller(reserved_clusters[0])
+            confirm_str = 'delete'
+            user_input = click.prompt(
+                f'To proceed, please check the warning above and type '
+                f'{colorama.Style.BRIGHT}{confirm_str!r}'
+                f'{colorama.Style.RESET_ALL}',
+                type=str)
+            if user_input != confirm_str:
+                raise click.Abort()
+            no_confirm = True
         names += reserved_clusters
 
     if apply_to_all:
@@ -2823,7 +2782,7 @@ def _down_or_stop_clusters(
         click.echo('Cluster(s) not found (tip: see `sky status`).')
         return
 
-    if not no_confirm and len(clusters) > 0:
+    if not no_confirm and clusters:
         cluster_str = 'clusters' if len(clusters) > 1 else 'cluster'
         cluster_list = ', '.join(clusters)
         click.confirm(
@@ -2904,7 +2863,6 @@ def _down_or_stop_clusters(
 
 @_interactive_node_cli_command
 @usage_lib.entrypoint
-# pylint: disable=redefined-outer-name
 def gpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
             cloud: Optional[str], region: Optional[str], zone: Optional[str],
             instance_type: Optional[str], cpus: Optional[str],
@@ -2950,10 +2908,16 @@ def gpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
     if name is None:
         name = _default_interactive_node_name('gpunode')
 
-    user_requested_resources = not (cloud is None and region is None and
-                                    zone is None and instance_type is None and
-                                    cpus is None and memory is None and
-                                    gpus is None and use_spot is None)
+    user_requested_resources = (
+        cloud is not None
+        or region is not None
+        or zone is not None
+        or instance_type is not None
+        or cpus is not None
+        or memory is not None
+        or gpus is not None
+        or use_spot is not None
+    )
     default_resources = _INTERACTIVE_NODE_DEFAULT_RESOURCES['gpunode']
     cloud_provider = clouds.CLOUD_REGISTRY.from_str(cloud)
     if gpus is None and instance_type is None:
@@ -2990,7 +2954,6 @@ def gpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
 
 @_interactive_node_cli_command
 @usage_lib.entrypoint
-# pylint: disable=redefined-outer-name
 def cpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
             cloud: Optional[str], region: Optional[str], zone: Optional[str],
             instance_type: Optional[str], cpus: Optional[str],
@@ -3034,10 +2997,15 @@ def cpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
     if name is None:
         name = _default_interactive_node_name('cpunode')
 
-    user_requested_resources = not (cloud is None and region is None and
-                                    zone is None and instance_type is None and
-                                    cpus is None and memory is None and
-                                    use_spot is None)
+    user_requested_resources = (
+        cloud is not None
+        or region is not None
+        or zone is not None
+        or instance_type is not None
+        or cpus is not None
+        or memory is not None
+        or use_spot is not None
+    )
     default_resources = _INTERACTIVE_NODE_DEFAULT_RESOURCES['cpunode']
     cloud_provider = clouds.CLOUD_REGISTRY.from_str(cloud)
     if instance_type is None:
@@ -3071,7 +3039,6 @@ def cpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
 
 @_interactive_node_cli_command
 @usage_lib.entrypoint
-# pylint: disable=redefined-outer-name
 def tpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
             region: Optional[str], zone: Optional[str],
             instance_type: Optional[str], cpus: Optional[str],
@@ -3116,10 +3083,15 @@ def tpunode(cluster: str, yes: bool, port_forward: Optional[List[int]],
     if name is None:
         name = _default_interactive_node_name('tpunode')
 
-    user_requested_resources = not (region is None and zone is None and
-                                    instance_type is None and cpus is None and
-                                    memory is None and tpus is None and
-                                    use_spot is None)
+    user_requested_resources = (
+        region is not None
+        or zone is not None
+        or instance_type is not None
+        or cpus is not None
+        or memory is not None
+        or tpus is not None
+        or use_spot is not None
+    )
     default_resources = _INTERACTIVE_NODE_DEFAULT_RESOURCES['tpunode']
     accelerator_args = default_resources.accelerator_args
     if tpu_vm:
@@ -3544,7 +3516,6 @@ def spot():
                 type=str,
                 nargs=-1,
                 **_get_shell_complete_args(_complete_file_name))
-# TODO(zhwu): Add --dryrun option to test the launch command.
 @_add_click_options(_TASK_OPTIONS + _EXTRA_RESOURCES_OPTIONS)
 @click.option('--cpus',
               default=None,
@@ -3665,9 +3636,7 @@ def spot_launch(
     )
     # Deprecation.
     if retry_until_up is not None:
-        flag_str = '--retry-until-up'
-        if not retry_until_up:
-            flag_str = '--no-retry-until-up'
+        flag_str = '--no-retry-until-up' if not retry_until_up else '--retry-until-up'
         click.secho(
             f'Flag {flag_str} is deprecated and will be removed in a '
             'future release (managed spot jobs will always be retried). '
@@ -3832,7 +3801,6 @@ _add_command_alias_to_group(spot, spot_queue, 'status', hidden=True)
               required=False,
               help='Skip confirmation prompt.')
 @usage_lib.entrypoint
-# pylint: disable=redefined-builtin
 def spot_cancel(name: Optional[str], job_ids: Tuple[int], all: bool, yes: bool):
     """Cancel managed spot jobs.
 
@@ -3857,7 +3825,7 @@ def spot_cancel(name: Optional[str], job_ids: Tuple[int], all: bool, yes: bool):
 
     job_id_str = ','.join(map(str, job_ids))
     if sum([len(job_ids) > 0, name is not None, all]) != 1:
-        argument_str = f'--job-ids {job_id_str}' if len(job_ids) > 0 else ''
+        argument_str = f'--job-ids {job_id_str}' if job_ids else ''
         argument_str += f' --name {name}' if name is not None else ''
         argument_str += ' --all' if all else ''
         raise click.UsageError(
@@ -3939,10 +3907,7 @@ def spot_dashboard(port: Optional[int]):
         sys.exit(1)
     # SSH forward a free local port to remote's dashboard port.
     remote_port = constants.SPOT_DASHBOARD_REMOTE_PORT
-    if port is None:
-        free_port = common_utils.find_free_port(remote_port)
-    else:
-        free_port = port
+    free_port = common_utils.find_free_port(remote_port) if port is None else port
     ssh_command = (f'ssh -qNL {free_port}:localhost:{remote_port} '
                    f'{spot_lib.SPOT_CONTROLLER_NAME}')
     click.echo('Forwarding port: ', nl=False)

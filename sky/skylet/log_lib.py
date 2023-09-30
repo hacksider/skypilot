@@ -283,14 +283,12 @@ def make_task_bash_script(codegen: str,
             cd {constants.SKY_REMOTE_WORKDIR}"""),
     ]
     if env_vars is not None:
-        for k, v in env_vars.items():
-            script.append(f'export {k}="{v}"')
+        script.extend(f'export {k}="{v}"' for k, v in env_vars.items())
     script += [
         codegen,
         '',  # New line at EOF.
     ]
-    script = '\n'.join(script)
-    return script
+    return '\n'.join(script)
 
 
 def add_ray_env_vars(
@@ -413,9 +411,7 @@ def tail_logs(job_owner: str,
         spot_job_id: The spot job id (for logging info only to avoid confusion).
         follow: Whether to follow the logs or print the logs so far and exit.
     """
-    job_str = f'job {job_id}'
-    if spot_job_id is not None:
-        job_str = f'spot job {spot_job_id}'
+    job_str = f'job {job_id}' if spot_job_id is None else f'spot job {spot_job_id}'
     if log_dir is None:
         print(f'{job_str.capitalize()} not found (see `sky queue`).',
               file=sys.stderr)
@@ -466,7 +462,7 @@ def tail_logs(job_owner: str,
         try:
             start_stream = False
             with open(log_path, 'r') as f:
-                for line in f.readlines():
+                for line in f:
                     if start_stream_at in line:
                         start_stream = True
                     if start_stream:

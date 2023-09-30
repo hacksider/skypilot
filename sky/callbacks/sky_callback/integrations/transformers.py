@@ -40,9 +40,7 @@ class SkyTransformersCallback(transformers.TrainerCallback):
         if self._total_steps is not None:
             return self._total_steps
         total_steps = state.max_steps
-        if total_steps is None or total_steps < 0:
-            return None
-        return total_steps
+        return None if total_steps is None or total_steps < 0 else total_steps
 
     def on_train_begin(self, args: transformers.TrainingArguments,
                        state: transformers.TrainerState,

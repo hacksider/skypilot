@@ -153,8 +153,7 @@ class step_iterator:
         # Refer to: https://github.com/tqdm/tqdm/blob/4f208e72552c4d916aa4fe6a955349ee8b2ed353/tqdm/std.py#L1177  # pylint: disable=line-too-long
         iterable = self._iterable
         if _DISABLE_CALLBACK or _sky_callback is None:
-            for obj in iterable:
-                yield obj
+            yield from iterable
         else:
             # Only rank-0 process will execute below.
             for obj in iterable:

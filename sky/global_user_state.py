@@ -282,10 +282,7 @@ def update_last_use(cluster_name: str):
 def remove_cluster(cluster_name: str, terminate: bool) -> None:
     """Removes cluster_name mapping."""
     cluster_hash = _get_hash_for_existing_cluster(cluster_name)
-    usage_intervals = _get_cluster_usage_intervals(cluster_hash)
-
-    # usage_intervals is not None and not empty
-    if usage_intervals:
+    if usage_intervals := _get_cluster_usage_intervals(cluster_hash):
         assert cluster_hash is not None, cluster_name
         start_time = usage_intervals.pop()[0]
         end_time = int(time.time())
@@ -362,9 +359,7 @@ def get_cluster_launch_time(cluster_name: str) -> Optional[int]:
     rows = _DB.cursor.execute('SELECT launched_at FROM clusters WHERE name=(?)',
                               (cluster_name,))
     for (launch_time,) in rows:
-        if launch_time is None:
-            return None
-        return int(launch_time)
+        return None if launch_time is None else int(launch_time)
     return None
 
 
@@ -372,9 +367,7 @@ def get_cluster_info(cluster_name: str) -> Optional[Dict[str, Any]]:
     rows = _DB.cursor.execute('SELECT metadata FROM clusters WHERE name=(?)',
                               (cluster_name,))
     for (metadata,) in rows:
-        if metadata is None:
-            return None
-        return json.loads(metadata)
+        return None if metadata is None else json.loads(metadata)
     return None
 
 
@@ -399,17 +392,13 @@ def _get_cluster_usage_intervals(
         'SELECT usage_intervals FROM cluster_history WHERE cluster_hash=(?)',
         (cluster_hash,))
     for (usage_intervals,) in rows:
-        if usage_intervals is None:
-            return None
-        return pickle.loads(usage_intervals)
+        return None if usage_intervals is None else pickle.loads(usage_intervals)
     return None
 
 
 def _get_cluster_launch_time(cluster_hash: str) -> Optional[int]:
     usage_intervals = _get_cluster_usage_intervals(cluster_hash)
-    if usage_intervals is None:
-        return None
-    return usage_intervals[0][0]
+    return None if usage_intervals is None else usage_intervals[0][0]
 
 
 def _get_cluster_duration(cluster_hash: str) -> int:
@@ -467,9 +456,7 @@ def _get_hash_for_existing_cluster(cluster_name: str) -> Optional[str]:
     rows = _DB.cursor.execute(
         'SELECT cluster_hash FROM clusters WHERE name=(?)', (cluster_name,))
     for (cluster_hash,) in rows:
-        if cluster_hash is None:
-            return None
-        return cluster_hash
+        return None if cluster_hash is None else cluster_hash
     return None
 
 
@@ -492,14 +479,7 @@ def _load_owner(record_owner: Optional[str]) -> Optional[List[str]]:
         return None
     try:
         result = json.loads(record_owner)
-        if result is not None and not isinstance(result, list):
-            # Backwards compatibility for old records, which were stored as
-            # a string instead of a list. It is possible that json.loads
-            # will parse the string with all numbers as an int or escape
-            # some characters, such as \n, so we need to use the original
-            # record_owner.
-            return [record_owner]
-        return result
+        return result if result is None or isinstance(result, list) else [record_owner]
     except json.JSONDecodeError:
         # Backwards compatibility for old records, which were stored as
         # a string instead of a list. This will happen when the previous
@@ -517,8 +497,7 @@ def get_cluster_from_name(
         # breaking the previous code.
         (name, launched_at, handle, last_use, status, autostop, metadata,
          to_down, owner, cluster_hash) = row[:10]
-        # TODO: use namedtuple instead of dict
-        record = {
+        return {
             'name': name,
             'launched_at': launched_at,
             'handle': pickle.loads(handle),
@@ -530,7 +509,6 @@ def get_cluster_from_name(
             'metadata': json.loads(metadata),
             'cluster_hash': cluster_hash,
         }
-        return record
     return None
 
 
@@ -600,9 +578,7 @@ def get_clusters_from_history() -> List[Dict[str, Any]]:
 
         records.append(record)
 
-    # sort by launch time, descending in recency
-    records = sorted(records, key=lambda record: -record['launched_at'])
-    return records
+    return sorted(records, key=lambda record: -record['launched_at'])
 
 
 def get_cluster_names_start_with(starts_with: str) -> List[str]:
@@ -715,9 +691,7 @@ def get_handle_from_storage_name(
     rows = _DB.cursor.execute('SELECT handle FROM storage WHERE name=(?)',
                               (storage_name,))
     for (handle,) in rows:
-        if handle is None:
-            return None
-        return pickle.loads(handle)
+        return None if handle is None else pickle.loads(handle)
     return None
 
 
@@ -736,14 +710,13 @@ def get_storage_names_start_with(starts_with: str) -> List[str]:
 
 def get_storage() -> List[Dict[str, Any]]:
     rows = _DB.cursor.execute('select * from storage')
-    records = []
-    for name, launched_at, handle, last_use, status in rows:
-        # TODO: use namedtuple instead of dict
-        records.append({
+    return [
+        {
             'name': name,
             'launched_at': launched_at,
             'handle': pickle.loads(handle),
             'last_use': last_use,
             'status': status_lib.StorageStatus[status],
-        })
-    return records
+        }
+        for name, launched_at, handle, last_use, status in rows
+    ]

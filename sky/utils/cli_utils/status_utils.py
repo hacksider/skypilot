@@ -26,7 +26,7 @@ def truncate_long_string(s: str, max_length: int = 35) -> str:
         return s
     splits = s.split(' ')
     if len(splits[0]) > max_length:
-        return splits[0][:max_length] + '...'  # Use '…'?
+        return f'{splits[0][:max_length]}...'
     # Truncate on word boundary.
     i = 0
     total = 0
@@ -37,7 +37,7 @@ def truncate_long_string(s: str, max_length: int = 35) -> str:
     prefix = ' '.join(splits[:i])
     if len(prefix) < max_length:
         prefix += s[len(prefix):max_length]
-    return prefix + '...'
+    return f'{prefix}...'
 
 
 class StatusColumn:
@@ -86,18 +86,20 @@ def show_status_table(cluster_records: List[_ClusterRecord],
                      trunc_length=COMMAND_TRUNC_LENGTH if not show_all else 0),
     ]
 
-    columns = []
-    for status_column in status_columns:
-        if status_column.show_by_default or show_all:
-            columns.append(status_column.name)
+    columns = [
+        status_column.name
+        for status_column in status_columns
+        if status_column.show_by_default or show_all
+    ]
     cluster_table = log_utils.create_table(columns)
 
     num_pending_autostop = 0
     for record in cluster_records:
-        row = []
-        for status_column in status_columns:
-            if status_column.show_by_default or show_all:
-                row.append(status_column.calc(record))
+        row = [
+            status_column.calc(record)
+            for status_column in status_columns
+            if status_column.show_by_default or show_all
+        ]
         cluster_table.add_row(row)
         num_pending_autostop += _is_pending_autostop(record)
 
@@ -118,8 +120,7 @@ def get_total_cost_of_displayed_records(
     if display_all:
         displayed_records = cluster_records
 
-    total_cost = sum(record['total_cost'] for record in displayed_records)
-    return total_cost
+    return sum(record['total_cost'] for record in displayed_records)
 
 
 def show_cost_report_table(cluster_records: List[_ClusterCostReportRecord],
@@ -165,10 +166,11 @@ def show_cost_report_table(cluster_records: List[_ClusterCostReportRecord],
                      show_by_default=True),
     ]
 
-    columns = []
-    for status_column in status_columns:
-        if status_column.show_by_default or show_all:
-            columns.append(status_column.name)
+    columns = [
+        status_column.name
+        for status_column in status_columns
+        if status_column.show_by_default or show_all
+    ]
     cluster_table = log_utils.create_table(columns)
 
     num_lines_to_display = NUM_COST_REPORT_LINES
@@ -180,10 +182,11 @@ def show_cost_report_table(cluster_records: List[_ClusterCostReportRecord],
         key=lambda report: -_get_status_value_for_cost_report(report))
 
     for record in cluster_records[:num_lines_to_display]:
-        row = []
-        for status_column in status_columns:
-            if status_column.show_by_default or show_all:
-                row.append(status_column.calc(record))
+        row = [
+            status_column.calc(record)
+            for status_column in status_columns
+            if status_column.show_by_default or show_all
+        ]
         cluster_table.add_row(row)
 
     if cluster_records:
@@ -255,10 +258,9 @@ def show_local_status_table(local_clusters: List[str]):
             for idx, resource in enumerate(local_cluster_resources):
                 if not bool(resource):
                     local_cluster_resources[idx] = None
-            resources_str = '[{}]'.format(', '.join(
-                map(str, local_cluster_resources)))
-        command_str = cluster_status['last_use']
+            resources_str = f"[{', '.join(map(str, local_cluster_resources))}]"
         cluster_name = handle.cluster_name
+        command_str = cluster_status['last_use']
         row = [
             # NAME
             cluster_name,
@@ -368,9 +370,7 @@ def _get_head_ip(cluster_record: _ClusterRecord) -> str:
     handle = cluster_record['handle']
     if not isinstance(handle, backends.CloudVmRayResourceHandle):
         return '-'
-    if handle.head_ip is None:
-        return '-'
-    return handle.head_ip
+    return '-' if handle.head_ip is None else handle.head_ip
 
 
 def _is_pending_autostop(cluster_record: _ClusterRecord) -> bool:
@@ -385,9 +385,7 @@ def _is_pending_autostop(cluster_record: _ClusterRecord) -> bool:
 def _get_status_value_for_cost_report(
         cluster_cost_report_record: _ClusterCostReportRecord) -> int:
     status = cluster_cost_report_record['status']
-    if status is None:
-        return -1
-    return 1
+    return -1 if status is None else 1
 
 
 def _get_status_for_cost_report(
@@ -404,10 +402,7 @@ def _get_resources_for_cost_report(
     launched_resources = cluster_cost_report_record['resources']
 
     launched_resource_str = str(launched_resources)
-    resources_str = (f'{launched_nodes}x '
-                     f'{launched_resource_str}')
-
-    return resources_str
+    return f'{launched_nodes}x {launched_resource_str}'
 
 
 def _get_price_for_cost_report(
@@ -416,15 +411,11 @@ def _get_price_for_cost_report(
     launched_resources = cluster_cost_report_record['resources']
 
     hourly_cost = (launched_resources.get_cost(3600) * launched_nodes)
-    price_str = f'$ {hourly_cost:.2f}'
-    return price_str
+    return f'$ {hourly_cost:.2f}'
 
 
 def _get_estimated_cost_for_cost_report(
         cluster_cost_report_record: _ClusterCostReportRecord) -> str:
     cost = cluster_cost_report_record['total_cost']
 
-    if not cost:
-        return '-'
-
-    return f'$ {cost:.2f}'
+    return '-' if not cost else f'$ {cost:.2f}'

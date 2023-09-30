@@ -293,9 +293,7 @@ def _send_to_loki(message_type: MessageType):
     message.send_time = _get_current_timestamp_ns()
     log_timestamp = message.start_time
 
-    environment = 'prod'
-    if env_options.Options.IS_DEVELOPER.get():
-        environment = 'dev'
+    environment = 'dev' if env_options.Options.IS_DEVELOPER.get() else 'prod'
     prom_labels = {'type': message_type.value, 'environment': environment}
 
     headers = {'Content-type': 'application/json'}
@@ -400,12 +398,9 @@ def entrypoint_context(name: str, fallback: bool = False):
     privacy_policy_indicator = os.path.expanduser(constants.PRIVACY_POLICY_PATH)
     if not env_options.Options.DISABLE_LOGGING.get():
         os.makedirs(os.path.dirname(privacy_policy_indicator), exist_ok=True)
-        try:
+        with contextlib.suppress(FileExistsError):
             with open(privacy_policy_indicator, 'x'):
                 click.secho(constants.USAGE_POLICY_MESSAGE, fg='yellow')
-        except FileExistsError:
-            pass
-
     is_entry = messages.usage.entrypoint is None
     if is_entry and not fallback:
         for message in messages.values():

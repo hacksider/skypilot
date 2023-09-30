@@ -400,10 +400,11 @@ def _filter_instances(ec2, filters: List[Dict[str, Any]],
     if included_instances is not None:
         instances = instances.filter(InstanceIds=included_instances)
     elif excluded_instances is not None:
-        included_instances = []
-        for inst in list(instances):
-            if inst.id not in excluded_instances:
-                included_instances.append(inst.id)
+        included_instances = [
+            inst.id
+            for inst in list(instances)
+            if inst.id not in excluded_instances
+        ]
         instances = instances.filter(InstanceIds=included_instances)
     return instances
 

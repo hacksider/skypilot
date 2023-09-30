@@ -59,8 +59,7 @@ def load_chain_dag_from_yaml(
 def dump_chain_dag_to_yaml(dag: dag_lib.Dag, path: str) -> None:
     assert dag.is_chain(), dag
     configs = [{'name': dag.name}]
-    for task in dag.tasks:
-        configs.append(task.to_yaml_config())
+    configs.extend(task.to_yaml_config() for task in dag.tasks)
     common_utils.dump_yaml(path, configs)
 
 

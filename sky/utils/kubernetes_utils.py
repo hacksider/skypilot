@@ -86,11 +86,11 @@ def get_gke_accelerator_name(accelerator: str) -> str:
     Uses the format - nvidia-tesla-<accelerator>.
     A100-80GB and L4 are an exception - they use nvidia-<accelerator>.
     """
-    if accelerator in ('A100-80GB', 'L4'):
+    if accelerator in {'A100-80GB', 'L4'}:
         # A100-80GB and L4 have a different name pattern.
-        return 'nvidia-{}'.format(accelerator.lower())
+        return f'nvidia-{accelerator.lower()}'
     else:
-        return 'nvidia-tesla-{}'.format(accelerator.lower())
+        return f'nvidia-tesla-{accelerator.lower()}'
 
 
 class GKELabelFormatter(GPULabelFormatter):
@@ -256,7 +256,7 @@ def check_instance_fits(instance: str) -> Tuple[bool, Optional[str]]:
             node for node in nodes if gpu_label_key in node.metadata.labels and
             node.metadata.labels[gpu_label_key] == gpu_label_val
         ]
-        assert len(gpu_nodes) > 0, 'GPU nodes not found'
+        assert gpu_nodes, 'GPU nodes not found'
         candidate_nodes = gpu_nodes
         not_fit_reason_prefix = (f'GPU nodes with {acc_type} do not have '
                                  'enough CPU and/or memory. ')
@@ -342,8 +342,7 @@ def get_gpu_label_key_value(acc_type: str, check_mode=False) -> Tuple[str, str]:
             with ux_utils.print_exception_no_traceback():
                 suffix = ''
                 if env_options.Options.SHOW_DEBUG_INFO.get():
-                    gpus_available = set(
-                        v for k, v in node_labels if k == k8s_acc_label_key)
+                    gpus_available = {v for k, v in node_labels if k == k8s_acc_label_key}
                     suffix = f' Available GPUs on the cluster: {gpus_available}'
                 raise exceptions.ResourcesUnavailableError(
                     'Could not find any node in the Kubernetes cluster '
@@ -488,7 +487,7 @@ def get_current_kube_config_context_namespace() -> str:
 
 
 def parse_cpu_or_gpu_resource(resource_qty_str: str) -> Union[int, float]:
-    resource_str = str(resource_qty_str)
+    resource_str = resource_qty_str
     if resource_str[-1] == 'm':
         # For example, '500m' rounds up to 1.
         return math.ceil(int(resource_str[:-1]) / 1000)
@@ -504,7 +503,7 @@ def parse_memory_resource(resource_qty_str: str,
         raise ValueError(
             f'Invalid unit: {unit}. Valid units are: {valid_units}')
 
-    resource_str = str(resource_qty_str)
+    resource_str = resource_qty_str
     bytes_value: Union[int, float]
     try:
         bytes_value = int(resource_str)
@@ -583,21 +582,19 @@ class KubernetesInstanceType:
         pattern = re.compile(
             r'^(?P<cpus>\d+(\.\d+)?)CPU--(?P<memory>\d+(\.\d+)?)GB(?:--(?P<accelerator_count>\d+)(?P<accelerator_type>\S+))?$'  # pylint: disable=line-too-long
         )
-        match = pattern.match(name)
-        if match:
-            cpus = float(match.group('cpus'))
-            memory = float(match.group('memory'))
-            accelerator_count = match.group('accelerator_count')
-            accelerator_type = match.group('accelerator_type')
-            if accelerator_count:
-                accelerator_count = int(accelerator_count)
-                accelerator_type = str(accelerator_type)
-            else:
-                accelerator_count = None
-                accelerator_type = None
-            return cpus, memory, accelerator_count, accelerator_type
-        else:
+        if not (match := pattern.match(name)):
             raise ValueError(f'Invalid instance name: {name}')
+        cpus = float(match.group('cpus'))
+        memory = float(match.group('memory'))
+        accelerator_count = match.group('accelerator_count')
+        accelerator_type = match.group('accelerator_type')
+        if accelerator_count:
+            accelerator_count = int(accelerator_count)
+            accelerator_type = str(accelerator_type)
+        else:
+            accelerator_count = None
+            accelerator_type = None
+        return cpus, memory, accelerator_count, accelerator_type
 
     @classmethod
     def from_instance_type(cls, name: str) -> 'KubernetesInstanceType':
@@ -706,10 +703,9 @@ def get_ssh_proxy_command(private_key_path: str, ssh_jump_name: str,
     ssh_jump_ip = get_external_ip(network_mode)
     if network_mode == KubernetesNetworkingMode.NODEPORT:
         ssh_jump_port = get_port(ssh_jump_name, namespace)
-        ssh_jump_proxy_command = construct_ssh_jump_command(
-            private_key_path, ssh_jump_port, ssh_jump_ip)
-    # Setting kubectl port-forward/socat to establish ssh session using
-    # ClusterIP service to disallow any ports opened
+        return construct_ssh_jump_command(
+            private_key_path, ssh_jump_port, ssh_jump_ip
+        )
     else:
         ssh_jump_port = LOCAL_PORT_FOR_PORT_FORWARD
         vars_to_fill = {
@@ -719,10 +715,12 @@ def get_ssh_proxy_command(private_key_path: str, ssh_jump_name: str,
         backend_utils.fill_template(port_fwd_proxy_cmd_template,
                                     vars_to_fill,
                                     output_path=port_fwd_proxy_cmd_path)
-        ssh_jump_proxy_command = construct_ssh_jump_command(
-            private_key_path, ssh_jump_port, ssh_jump_ip,
-            port_fwd_proxy_cmd_path)
-    return ssh_jump_proxy_command
+        return construct_ssh_jump_command(
+            private_key_path,
+            ssh_jump_port,
+            ssh_jump_ip,
+            port_fwd_proxy_cmd_path,
+        )
 
 
 def setup_ssh_jump_svc(ssh_jump_name: str, namespace: str,
@@ -746,43 +744,41 @@ def setup_ssh_jump_svc(ssh_jump_name: str, namespace: str,
         kubernetes.core_api().create_namespaced_service(namespace,
                                                         content['service_spec'])
     except kubernetes.api_exception() as e:
-        # SSH Jump Pod service already exists.
-        if e.status == 409:
-            ssh_jump_service = kubernetes.core_api().read_namespaced_service(
-                name=ssh_jump_name, namespace=namespace)
-            curr_svc_type = ssh_jump_service.spec.type
-            if service_type.value == curr_svc_type:
-                # If the currently existing SSH Jump service's type is identical
-                # to user's configuration for networking mode
-                logger.debug(
-                    f'SSH Jump Service {ssh_jump_name} already exists in the '
-                    'cluster, using it.')
-            else:
-                # If a different type of service type for SSH Jump pod compared
-                # to user's configuration for networking mode exists, we remove
-                # existing servie to create a new one following user's config
-                kubernetes.core_api().delete_namespaced_service(
-                    name=ssh_jump_name, namespace=namespace)
-                kubernetes.core_api().create_namespaced_service(
-                    namespace, content['service_spec'])
-                port_forward_mode = KubernetesNetworkingMode.PORTFORWARD.value
-                nodeport_mode = KubernetesNetworkingMode.NODEPORT.value
-                clusterip_svc = KubernetesServiceType.CLUSTERIP.value
-                nodeport_svc = KubernetesServiceType.NODEPORT.value
-                curr_network_mode = port_forward_mode \
-                    if curr_svc_type == clusterip_svc else nodeport_mode
-                new_network_mode = nodeport_mode \
-                    if curr_svc_type == clusterip_svc else port_forward_mode
-                new_svc_type = nodeport_svc \
-                    if curr_svc_type == clusterip_svc else clusterip_svc
-                logger.info(
-                    f'Switching the networking mode from '
-                    f'\'{curr_network_mode}\' to \'{new_network_mode}\' '
-                    f'following networking configuration. Deleting existing '
-                    f'\'{curr_svc_type}\' service and recreating as '
-                    f'\'{new_svc_type}\' service.')
-        else:
+        if e.status != 409:
             raise
+        ssh_jump_service = kubernetes.core_api().read_namespaced_service(
+            name=ssh_jump_name, namespace=namespace)
+        curr_svc_type = ssh_jump_service.spec.type
+        if service_type.value == curr_svc_type:
+            # If the currently existing SSH Jump service's type is identical
+            # to user's configuration for networking mode
+            logger.debug(
+                f'SSH Jump Service {ssh_jump_name} already exists in the '
+                'cluster, using it.')
+        else:
+            # If a different type of service type for SSH Jump pod compared
+            # to user's configuration for networking mode exists, we remove
+            # existing servie to create a new one following user's config
+            kubernetes.core_api().delete_namespaced_service(
+                name=ssh_jump_name, namespace=namespace)
+            kubernetes.core_api().create_namespaced_service(
+                namespace, content['service_spec'])
+            port_forward_mode = KubernetesNetworkingMode.PORTFORWARD.value
+            nodeport_mode = KubernetesNetworkingMode.NODEPORT.value
+            clusterip_svc = KubernetesServiceType.CLUSTERIP.value
+            nodeport_svc = KubernetesServiceType.NODEPORT.value
+            curr_network_mode = port_forward_mode \
+                if curr_svc_type == clusterip_svc else nodeport_mode
+            new_network_mode = nodeport_mode \
+                if curr_svc_type == clusterip_svc else port_forward_mode
+            new_svc_type = nodeport_svc \
+                if curr_svc_type == clusterip_svc else clusterip_svc
+            logger.info(
+                f'Switching the networking mode from '
+                f'\'{curr_network_mode}\' to \'{new_network_mode}\' '
+                f'following networking configuration. Deleting existing '
+                f'\'{curr_svc_type}\' service and recreating as '
+                f'\'{new_svc_type}\' service.')
     else:
         logger.info(f'Created SSH Jump Service {ssh_jump_name}.')
 
@@ -878,7 +874,7 @@ def clean_zombie_ssh_jump_pod(namespace: str, node_id: str):
     def find(l, predicate):
         """Utility function to find element in given list"""
         results = [x for x in l if predicate(x)]
-        return results[0] if len(results) > 0 else None
+        return results[0] if results else None
 
     # Get the SSH jump pod name from the head pod
     try:
@@ -935,8 +931,7 @@ def fill_ssh_jump_template(ssh_key_secret: str, ssh_jump_image: str,
                               image=ssh_jump_image,
                               secret=ssh_key_secret,
                               service_type=service_type)
-    content = yaml.safe_load(cont)
-    return content
+    return yaml.safe_load(cont)
 
 
 def check_port_forward_mode_dependencies() -> None:

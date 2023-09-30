@@ -128,8 +128,8 @@ class _AsyncSummaryWriter(threading.Thread):
         num_step_begins = len(self._step_begins)
         num_step_ends = len(self._step_ends)
 
-        if summary.first_step_time is None:
-            if num_step_begins > 0:
+        if num_step_begins > 0:
+            if summary.first_step_time is None:
                 summary.first_step_time = self._step_begins[0]
         if summary.warmup_end_time is None:
             if num_step_ends >= summary.warmup_steps:

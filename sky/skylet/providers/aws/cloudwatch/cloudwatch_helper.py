@@ -15,8 +15,8 @@ from ray.autoscaler.tags import NODE_KIND_HEAD, TAG_RAY_CLUSTER_NAME, TAG_RAY_NO
 logger = logging.getLogger(__name__)
 
 RAY = "ray-autoscaler"
-CLOUDWATCH_RAY_INSTANCE_PROFILE = RAY + "-cloudwatch-v1"
-CLOUDWATCH_RAY_IAM_ROLE = RAY + "-cloudwatch-v1"
+CLOUDWATCH_RAY_INSTANCE_PROFILE = f"{RAY}-cloudwatch-v1"
+CLOUDWATCH_RAY_IAM_ROLE = f"{RAY}-cloudwatch-v1"
 CLOUDWATCH_AGENT_INSTALLED_AMI_TAG = "T6Iq2faj"
 CLOUDWATCH_AGENT_INSTALLED_TAG = "cloudwatch-agent-installed"
 CLOUDWATCH_CONFIG_HASH_TAG_BASE = "cloudwatch-config-hash"
@@ -82,9 +82,7 @@ class CloudwatchHelper:
             waiter.wait(InstanceIds=[node_id])
         except botocore.exceptions.WaiterError as e:
             logger.error(
-                "Failed while waiting for EC2 instance checks to complete: {}".format(
-                    e.message
-                )
+                f"Failed while waiting for EC2 instance checks to complete: {e.message}"
             )
             raise e
 
@@ -105,9 +103,7 @@ class CloudwatchHelper:
                 # check if user updated cloudwatch related config files.
                 # if so, perform corresponding actions.
                 if cur_cw_config_hash != ssm_cw_config_hash:
-                    logger.info(
-                        "Cloudwatch {} config file has changed.".format(config_type)
-                    )
+                    logger.info(f"Cloudwatch {config_type} config file has changed.")
                     self._upload_config_to_ssm_and_set_hash_tag(config_type)
                     self.CLOUDWATCH_CONFIG_TYPE_TO_UPDATE_FUNC_HEAD_NODE.get(
                         config_type
@@ -116,15 +112,12 @@ class CloudwatchHelper:
                 head_node_hash = self._get_head_node_config_hash(config_type)
                 cur_node_hash = self._get_cur_node_config_hash(config_type)
                 if head_node_hash != cur_node_hash:
-                    logger.info(
-                        "Cloudwatch {} config file has changed.".format(config_type)
-                    )
-                    update_func = (
+                    logger.info(f"Cloudwatch {config_type} config file has changed.")
+                    if update_func := (
                         self.CLOUDWATCH_CONFIG_TYPE_TO_UPDATE_FUNC_WORKER_NODE.get(
                             config_type
                         )
-                    )
-                    if update_func:
+                    ):
                         update_func()
                     self._update_cloudwatch_hash_tag_value(
                         self.node_id, head_node_hash, config_type
@@ -136,7 +129,7 @@ class CloudwatchHelper:
         cloudwatch_config = self.provider_config["cloudwatch"]
         dashboard_config = cloudwatch_config.get("dashboard", {})
         dashboard_name_cluster = dashboard_config.get("name", self.cluster_name)
-        dashboard_name = self.cluster_name + "-" + dashboard_name_cluster
+        dashboard_name = f"{self.cluster_name}-{dashboard_name_cluster}"
 
         widgets = self._replace_dashboard_config_vars(
             CloudwatchConfigType.DASHBOARD.value
@@ -149,14 +142,10 @@ class CloudwatchHelper:
         if issue_count > 0:
             for issue in response.get("DashboardValidationMessages"):
                 logging.error(
-                    "Error in dashboard config: {} - {}".format(
-                        issue["Message"], issue["DataPath"]
-                    )
+                    f'Error in dashboard config: {issue["Message"]} - {issue["DataPath"]}'
                 )
             raise Exception(
-                "Errors in dashboard configuration: {} issues raised".format(
-                    issue_count
-                )
+                f"Errors in dashboard configuration: {issue_count} issues raised"
             )
         else:
             logger.info("Successfully put dashboard to CloudWatch console")
@@ -182,17 +171,15 @@ class CloudwatchHelper:
     ) -> Dict[str, Any]:
         """send SSM command to the given nodes"""
         logger.debug(
-            "Sending SSM command to {} node(s). Document name: {}. "
-            "Parameters: {}.".format(node_id, document_name, parameters)
+            f"Sending SSM command to {node_id} node(s). Document name: {document_name}. Parameters: {parameters}."
         )
-        response = self.ssm_client.send_command(
+        return self.ssm_client.send_command(
             InstanceIds=[node_id],
             DocumentName=document_name,
             Parameters=parameters,
             MaxConcurrency="1",
             MaxErrors="0",
         )
-        return response
 
     def _ssm_command_waiter(
         self,
@@ -222,44 +209,25 @@ class CloudwatchHelper:
         while True:
             num_attempts += 1
             logger.debug(
-                "Listing SSM command ID {} invocations on node {}".format(
-                    command_id, node_id
-                )
+                f"Listing SSM command ID {command_id} invocations on node {node_id}"
             )
             response = self.ssm_client.list_command_invocations(
                 CommandId=command_id,
                 InstanceId=node_id,
             )
-            cmd_invocations = response["CommandInvocations"]
-            if not cmd_invocations:
-                logger.debug(
-                    "SSM Command ID {} invocation does not exist. If "
-                    "the command was just started, it may take a "
-                    "few seconds to register.".format(command_id)
-                )
-            else:
+            if cmd_invocations := response["CommandInvocations"]:
                 if len(cmd_invocations) > 1:
                     logger.warning(
-                        "Expected to find 1 SSM command invocation with "
-                        "ID {} on node {} but found {}: {}".format(
-                            command_id,
-                            node_id,
-                            len(cmd_invocations),
-                            cmd_invocations,
-                        )
+                        f"Expected to find 1 SSM command invocation with ID {command_id} on node {node_id} but found {len(cmd_invocations)}: {cmd_invocations}"
                     )
                 cmd_invocation = cmd_invocations[0]
                 if cmd_invocation["Status"] == "Success":
-                    logger.debug(
-                        "SSM Command ID {} completed successfully.".format(command_id)
-                    )
+                    logger.debug(f"SSM Command ID {command_id} completed successfully.")
                     cmd_invocation_res[node_id] = True
                     break
                 if num_attempts >= max_attempts:
                     logger.error(
-                        "Max attempts for command {} exceeded on node {}".format(
-                            command_id, node_id
-                        )
+                        f"Max attempts for command {command_id} exceeded on node {node_id}"
                     )
                     raise botocore.exceptions.WaiterError(
                         name="ssm_waiter",
@@ -274,15 +242,15 @@ class CloudwatchHelper:
                             document_name, parameters, node_id
                         )
                         command_id = response["Command"]["CommandId"]
-                        logger.debug(
-                            "Sent SSM command ID {} to node {}".format(
-                                command_id, node_id
-                            )
-                        )
+                        logger.debug(f"Sent SSM command ID {command_id} to node {node_id}")
                     else:
                         logger.debug(f"Ignoring Command ID {command_id} failure.")
                         cmd_invocation_res[node_id] = False
                         break
+            else:
+                logger.debug(
+                    f"SSM Command ID {command_id} invocation does not exist. If the command was just started, it may take a few seconds to register."
+                )
             time.sleep(delay_seconds)
 
         return cmd_invocation_res
@@ -363,11 +331,7 @@ class CloudwatchHelper:
         except botocore.exceptions.ClientError as e:
             if e.response["Error"]["Code"] == "ParameterNotFound":
                 logger.info(
-                    "Cloudwatch {} config file is not found "
-                    "at SSM parameter store. "
-                    "Checking for Unified CloudWatch Agent installation".format(
-                        config_type
-                    )
+                    f"Cloudwatch {config_type} config file is not found at SSM parameter store. Checking for Unified CloudWatch Agent installation"
                 )
                 return self._get_default_empty_config_file_hash()
             else:
@@ -381,26 +345,23 @@ class CloudwatchHelper:
 
     def _get_default_empty_config_file_hash(self):
         default_cw_config = "{}"
-        parameter_value = self._sha1_hash_json(default_cw_config)
-        return parameter_value
+        return self._sha1_hash_json(default_cw_config)
 
     def _get_ssm_param(self, parameter_name: str) -> str:
         """
         get the SSM parameter value associated with the given parameter name
         """
         response = self.ssm_client.get_parameter(Name=parameter_name)
-        logger.info("Successfully fetch ssm parameter: {}".format(parameter_name))
+        logger.info(f"Successfully fetch ssm parameter: {parameter_name}")
         res = response.get("Parameter", {})
-        cwa_parameter = res.get("Value", {})
-        return cwa_parameter
+        return res.get("Value", {})
 
     def _sha1_hash_json(self, value: str) -> str:
         """calculate the json string sha1 hash"""
         sha1_hash = hashlib.new("sha1")
         binary_value = value.encode("ascii")
         sha1_hash.update(binary_value)
-        sha1_res = sha1_hash.hexdigest()
-        return sha1_res
+        return sha1_hash.hexdigest()
 
     def _sha1_hash_file(self, config_type: str) -> str:
         """calculate the config file sha1 hash"""
@@ -408,8 +369,7 @@ class CloudwatchHelper:
             config_type
         )(config_type)
         value = json.dumps(config)
-        sha1_res = self._sha1_hash_json(value)
-        return sha1_res
+        return self._sha1_hash_json(value)
 
     def _upload_config_to_ssm_and_set_hash_tag(self, config_type: str):
         data = self.CLOUDWATCH_CONFIG_TYPE_TO_CONFIG_VARIABLE_REPLACE_FUNC.get(
@@ -427,8 +387,7 @@ class CloudwatchHelper:
             Tags=[{"Key": CLOUDWATCH_AGENT_INSTALLED_TAG, "Value": "True"}],
         )
         logger.info(
-            "Successfully add Unified CloudWatch Agent installed "
-            "tag on {}".format(node_id)
+            f"Successfully add Unified CloudWatch Agent installed tag on {node_id}"
         )
 
     def _update_cloudwatch_hash_tag_value(
@@ -440,17 +399,12 @@ class CloudwatchHelper:
             Tags=[{"Key": hash_key_value, "Value": sha1_hash_value}],
         )
         logger.info(
-            "Successfully update cloudwatch {} hash tag on {}".format(
-                config_type, node_id
-            )
+            f"Successfully update cloudwatch {config_type} hash tag on {node_id}"
         )
 
     def _get_ssm_param_name(self, config_type: str) -> str:
         """return the parameter name for cloudwatch configs"""
-        ssm_config_param_name = "AmazonCloudWatch-" + "ray_{}_config_{}".format(
-            config_type, self.cluster_name
-        )
-        return ssm_config_param_name
+        return f"AmazonCloudWatch-ray_{config_type}_config_{self.cluster_name}"
 
     def _put_ssm_param(self, parameter: Dict[str, Any], parameter_name: str) -> None:
         """upload cloudwatch config to the SSM parameter store"""
@@ -518,9 +472,7 @@ class CloudwatchHelper:
         """restart Unified CloudWatch Agent"""
         cwa_param_name = self._get_ssm_param_name(CloudwatchConfigType.AGENT.value)
         logger.info(
-            "Restarting Unified CloudWatch Agent package on node {}.".format(
-                self.node_id
-            )
+            f"Restarting Unified CloudWatch Agent package on node {self.node_id}."
         )
         self._stop_cloudwatch_agent()
         self._start_cloudwatch_agent(cwa_param_name)
@@ -528,7 +480,7 @@ class CloudwatchHelper:
     def _stop_cloudwatch_agent(self) -> None:
         """stop Unified CloudWatch Agent"""
         logger.info(
-            "Stopping Unified CloudWatch Agent package on node {}.".format(self.node_id)
+            f"Stopping Unified CloudWatch Agent package on node {self.node_id}."
         )
         parameters_stop_cwa = {
             "action": ["stop"],
@@ -542,12 +494,12 @@ class CloudwatchHelper:
             self.node_id,
             False,
         )
-        logger.info("Unified CloudWatch Agent stopped on node {}.".format(self.node_id))
+        logger.info(f"Unified CloudWatch Agent stopped on node {self.node_id}.")
 
     def _start_cloudwatch_agent(self, cwa_param_name: str) -> None:
         """start Unified CloudWatch Agent"""
         logger.info(
-            "Starting Unified CloudWatch Agent package on node {}.".format(self.node_id)
+            f"Starting Unified CloudWatch Agent package on node {self.node_id}."
         )
         parameters_start_cwa = {
             "action": ["configure"],
@@ -560,16 +512,13 @@ class CloudwatchHelper:
             "AmazonCloudWatch-ManageAgent", parameters_start_cwa, self.node_id
         )
         logger.info(
-            "Unified CloudWatch Agent started successfully on node {}.".format(
-                self.node_id
-            )
+            f"Unified CloudWatch Agent started successfully on node {self.node_id}."
         )
 
     def _setup_cwa(self) -> bool:
         cwa_installed = self._check_cwa_installed_ec2_tag()
         if cwa_installed == "False":
-            res_cwa_installed = self._ensure_cwa_installed_ssm(self.node_id)
-            return res_cwa_installed
+            return self._ensure_cwa_installed_ssm(self.node_id)
         else:
             return True
 
@@ -579,10 +528,7 @@ class CloudwatchHelper:
             self._get_current_cluster_session_nodes(self.cluster_name)
         )
         filters.append(
-            {
-                "Name": "tag:{}".format(TAG_RAY_NODE_KIND),
-                "Values": [NODE_KIND_HEAD],
-            }
+            {"Name": f"tag:{TAG_RAY_NODE_KIND}", "Values": [NODE_KIND_HEAD]}
         )
         try:
             instance = list(self.ec2_resource.instances.filter(Filters=filters))
@@ -592,9 +538,7 @@ class CloudwatchHelper:
                     return tag["Value"]
         except botocore.exceptions.ClientError as e:
             logger.warning(
-                "{} Error caught when getting value of {} tag on head node".format(
-                    e.response["Error"], hash_key_value
-                )
+                f'{e.response["Error"]} Error caught when getting value of {hash_key_value} tag on head node'
             )
 
     def _get_cur_node_config_hash(self, config_type: str) -> str:
@@ -611,16 +555,13 @@ class CloudwatchHelper:
             for tag in tags:
                 if tag["Key"] == hash_key_value:
                     logger.info(
-                        "Successfully get cloudwatch {} hash tag value from "
-                        "node {}".format(config_type, self.node_id)
+                        f"Successfully get cloudwatch {config_type} hash tag value from node {self.node_id}"
                     )
                     hash_value = tag["Value"]
             return hash_value
         except botocore.exceptions.ClientError as e:
             logger.warning(
-                "{} Error caught when getting hash tag {} tag".format(
-                    e.response["Error"], hash_key_value
-                )
+                f'{e.response["Error"]} Error caught when getting hash tag {hash_key_value} tag'
             )
 
     def _ensure_cwa_installed_ssm(self, node_id: str) -> bool:
@@ -629,9 +570,7 @@ class CloudwatchHelper:
         If not, notify user to use an AMI with
         the Unified CloudWatch Agent installed.
         """
-        logger.info(
-            "Checking Unified Cloudwatch Agent status on node {}".format(node_id)
-        )
+        logger.info(f"Checking Unified Cloudwatch Agent status on node {node_id}")
         parameters_status_cwa = {
             "action": ["status"],
             "mode": ["ec2"],
@@ -640,31 +579,21 @@ class CloudwatchHelper:
         cmd_invocation_res = self._ssm_command_waiter(
             "AmazonCloudWatch-ManageAgent", parameters_status_cwa, node_id, False
         )
-        cwa_installed = cmd_invocation_res.get(node_id, False)
-        if not cwa_installed:
-            logger.warning(
-                "Unified CloudWatch Agent not installed on {}. "
-                "Ray logs, metrics not picked up. "
-                "Please use an AMI with Unified CloudWatch Agent installed.".format(
-                    node_id
-                )
-            )
-            return False
-        else:
+        if cwa_installed := cmd_invocation_res.get(node_id, False):
             return True
+        logger.warning(
+            f"Unified CloudWatch Agent not installed on {node_id}. Ray logs, metrics not picked up. Please use an AMI with Unified CloudWatch Agent installed."
+        )
+        return False
 
     def _get_current_cluster_session_nodes(self, cluster_name: str) -> List[dict]:
-        filters = [
+        return [
             {
                 "Name": "instance-state-name",
                 "Values": ["pending", "running"],
             },
-            {
-                "Name": "tag:{}".format(TAG_RAY_CLUSTER_NAME),
-                "Values": [cluster_name],
-            },
+            {"Name": f"tag:{TAG_RAY_CLUSTER_NAME}", "Values": [cluster_name]},
         ]
-        return filters
 
     def _check_cwa_installed_ec2_tag(self) -> List[str]:
         """
@@ -682,18 +611,12 @@ class CloudwatchHelper:
             cwa_installed = str(False)
             for tag in tags:
                 if tag["Key"] == CLOUDWATCH_AGENT_INSTALLED_TAG:
-                    logger.info(
-                        "Unified CloudWatch Agent is installed on "
-                        "node {}".format(self.node_id)
-                    )
+                    logger.info(f"Unified CloudWatch Agent is installed on node {self.node_id}")
                     cwa_installed = tag["Value"]
             return cwa_installed
         except botocore.exceptions.ClientError as e:
             logger.warning(
-                "{} Error caught when getting Unified CloudWatch Agent "
-                "status based on {} tag".format(
-                    e.response["Error"], CLOUDWATCH_AGENT_INSTALLED_TAG
-                )
+                f'{e.response["Error"]} Error caught when getting Unified CloudWatch Agent status based on {CLOUDWATCH_AGENT_INSTALLED_TAG} tag'
             )
 
     @staticmethod
@@ -756,50 +679,50 @@ class CloudwatchHelper:
                 related operations if cloudwatch agent config is specifed in
                 cluster config file.
         """
-        cwa_cfg_exists = CloudwatchHelper.cloudwatch_config_exists(
-            config, CloudwatchConfigType.AGENT.value
-        )
-        if cwa_cfg_exists:
-            cloudwatch_managed_policy = {
-                "Version": "2012-10-17",
-                "Statement": [
-                    {
-                        "Effect": "Allow",
-                        "Action": [
-                            "ssm:SendCommand",
-                            "ssm:ListCommandInvocations",
-                            "iam:PassRole",
-                        ],
-                        "Resource": "*",
-                    }
-                ],
-            }
-            iam_client = iam.meta.client
-            iam_client.create_policy(
-                PolicyName="CloudwatchManagedPolicies",
-                PolicyDocument=json.dumps(cloudwatch_managed_policy),
+        if not (
+            cwa_cfg_exists := CloudwatchHelper.cloudwatch_config_exists(
+                config, CloudwatchConfigType.AGENT.value
             )
-            sts_client = client_cache("sts", config["region"])
-            account_id = sts_client.get_caller_identity().get("Account")
-            managed_policy_arn = (
-                "arn:aws:iam::{}:policy/CloudwatchManagedPolicies".format(account_id)
-            )
-            policy_waiter = iam_client.get_waiter("policy_exists")
-            policy_waiter.wait(
-                PolicyArn=managed_policy_arn,
-                WaiterConfig={"Delay": 2, "MaxAttempts": 200},
-            )
-            new_policy_arns = copy.copy(default_policy_arns)
-            new_policy_arns.extend(
-                [
-                    "arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy",
-                    "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
-                    managed_policy_arn,
-                ]
-            )
-            return new_policy_arns
-        else:
+        ):
             return default_policy_arns
+        cloudwatch_managed_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "ssm:SendCommand",
+                        "ssm:ListCommandInvocations",
+                        "iam:PassRole",
+                    ],
+                    "Resource": "*",
+                }
+            ],
+        }
+        iam_client = iam.meta.client
+        iam_client.create_policy(
+            PolicyName="CloudwatchManagedPolicies",
+            PolicyDocument=json.dumps(cloudwatch_managed_policy),
+        )
+        sts_client = client_cache("sts", config["region"])
+        account_id = sts_client.get_caller_identity().get("Account")
+        managed_policy_arn = (
+            f"arn:aws:iam::{account_id}:policy/CloudwatchManagedPolicies"
+        )
+        policy_waiter = iam_client.get_waiter("policy_exists")
+        policy_waiter.wait(
+            PolicyArn=managed_policy_arn,
+            WaiterConfig={"Delay": 2, "MaxAttempts": 200},
+        )
+        new_policy_arns = copy.copy(default_policy_arns)
+        new_policy_arns.extend(
+            [
+                "arn:aws:iam::aws:policy/CloudWatchAgentAdminPolicy",
+                "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+                managed_policy_arn,
+            ]
+        )
+        return new_policy_arns
 
     @staticmethod
     def cloudwatch_config_exists(config: Dict[str, Any], config_type: str) -> bool:

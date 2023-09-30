@@ -25,7 +25,7 @@ def prerequisite_check() -> Tuple[bool, str]:
         reason = 'kubectl not found. Please install kubectl and try again.'
     except subprocess.CalledProcessError as e:
         output = e.output.decode('utf-8')
-        reason = 'Error running kubectl: ' + output
+        reason = f'Error running kubectl: {output}'
     return prereq_ok, reason
 
 
@@ -44,13 +44,13 @@ def cleanup() -> Tuple[bool, str]:
     success = False
     reason = ''
     with rich_utils.safe_status('Cleaning up existing GPU labeling '
-                                'resources'):
+                                    'resources'):
         try:
             subprocess.run(del_command.split(), check=True, capture_output=True)
             success = True
         except subprocess.CalledProcessError as e:
             output = e.output.decode('utf-8')
-            reason = 'Error deleting existing GPU labeler resources: ' + output
+            reason = f'Error deleting existing GPU labeler resources: {output}'
         return success, reason
 
 
@@ -72,7 +72,7 @@ def label():
                 ['kubectl', 'apply', '-f', rbac_manifest_path])
         except subprocess.CalledProcessError as e:
             output = e.output.decode('utf-8')
-            print('Error setting up GPU labeling: ' + output)
+            print(f'Error setting up GPU labeling: {output}')
             return
 
     with rich_utils.safe_status('Creating GPU labeler jobs'):
@@ -90,12 +90,9 @@ def label():
         # Iterate over nodes
         nodes = v1.list_node().items
 
-        # Get the list of nodes with GPUs
-        gpu_nodes = []
-        for node in nodes:
-            if 'nvidia.com/gpu' in node.status.capacity:
-                gpu_nodes.append(node)
-
+        gpu_nodes = [
+            node for node in nodes if 'nvidia.com/gpu' in node.status.capacity
+        ]
         print(f'Found {len(gpu_nodes)} GPU nodes in the cluster')
 
         for node in gpu_nodes:
@@ -111,7 +108,7 @@ def label():
             # Create the job for this node`
             batch_v1.create_namespaced_job(namespace, job_manifest)
             print(f'Created GPU labeler job for node {node_name}')
-    if len(gpu_nodes) == 0:
+    if not gpu_nodes:
         print('No GPU nodes found in the cluster. If you have GPU nodes, '
               'please ensure that they have the label '
               '`nvidia.com/gpu: <number of GPUs>`')

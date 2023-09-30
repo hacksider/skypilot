@@ -144,13 +144,10 @@ class LambdaCloudClient:
         # So don't use launch requests to check availability.
         # See https://docs.lambdalabs.com/cloud/rate-limiting/ for more.
         available_regions = self.list_catalog()[instance_type]\
-                ['regions_with_capacity_available']
+                    ['regions_with_capacity_available']
         available_regions = [reg['name'] for reg in available_regions]
         if region not in available_regions:
-            if len(available_regions) > 0:
-                aval_reg = ' '.join(available_regions)
-            else:
-                aval_reg = 'None'
+            aval_reg = ' '.join(available_regions) if available_regions else 'None'
             raise LambdaCloudError(('instance-operations/launch/'
                                     'insufficient-capacity: Not enough '
                                     'capacity to fulfill launch request. '

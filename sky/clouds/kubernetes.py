@@ -139,10 +139,10 @@ class Kubernetes(clouds.Cloud):
         instance_cpus = float(
             cpus.strip('+')) if cpus is not None else cls._DEFAULT_NUM_VCPUS
         instance_mem = float(memory.strip('+')) if memory is not None else \
-            instance_cpus * cls._DEFAULT_MEMORY_CPU_RATIO
-        virtual_instance_type = kubernetes_utils.KubernetesInstanceType(
-            instance_cpus, instance_mem).name
-        return virtual_instance_type
+                instance_cpus * cls._DEFAULT_MEMORY_CPU_RATIO
+        return kubernetes_utils.KubernetesInstanceType(
+            instance_cpus, instance_mem
+        ).name
 
     @classmethod
     def get_accelerators_from_instance_type(
@@ -226,9 +226,9 @@ class Kubernetes(clouds.Cloud):
         # If GPUs are requested, set node label to match the GPU type.
         if acc_count > 0 and acc_type is not None:
             k8s_acc_label_key, k8s_acc_label_value = \
-                kubernetes_utils.get_gpu_label_key_value(acc_type)
+                    kubernetes_utils.get_gpu_label_key_value(acc_type)
 
-        deploy_vars = {
+        return {
             'instance_type': resources.instance_type,
             'custom_resources': custom_resources,
             'region': region.name,
@@ -244,7 +244,6 @@ class Kubernetes(clouds.Cloud):
             # TODO(romilb): Allow user to specify custom images
             'image_id': image_id,
         }
-        return deploy_vars
 
     def _get_feasible_launchable_resources(
         self, resources: 'resources_lib.Resources'
@@ -310,16 +309,15 @@ class Kubernetes(clouds.Cloud):
 
     @classmethod
     def check_credentials(cls) -> Tuple[bool, Optional[str]]:
-        if os.path.exists(os.path.expanduser(CREDENTIAL_PATH)):
-            # Test using python API
-            try:
-                return kubernetes_utils.check_credentials()
-            except Exception as e:  # pylint: disable=broad-except
-                return (False, 'Credential check failed: '
-                        f'{common_utils.format_exception(e)}')
-        else:
+        if not os.path.exists(os.path.expanduser(CREDENTIAL_PATH)):
             return (False, 'Credentials not found - '
                     f'check if {CREDENTIAL_PATH} exists.')
+        # Test using python API
+        try:
+            return kubernetes_utils.check_credentials()
+        except Exception as e:  # pylint: disable=broad-except
+            return (False, 'Credential check failed: '
+                    f'{common_utils.format_exception(e)}')
 
     def get_credential_file_mounts(self) -> Dict[str, str]:
         return {CREDENTIAL_PATH: CREDENTIAL_PATH}

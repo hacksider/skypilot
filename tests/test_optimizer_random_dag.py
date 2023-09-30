@@ -35,11 +35,7 @@ def generate_random_dag(
             op.set_time_estimator(lambda _: task_runtime)
             op.num_nodes = random.randint(1, max_num_nodes)
 
-            if i == 0:
-                num_parents = 0
-            else:
-                num_parents = random.randint(0, min(i, max_num_parents))
-
+            num_parents = 0 if i == 0 else random.randint(0, min(i, max_num_parents))
             if num_parents == 0:
                 src_cloud = random.choice(['s3:', 'gs:', None])
                 src_volume = random.randint(0, max_data_size)

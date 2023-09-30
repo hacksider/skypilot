@@ -101,7 +101,7 @@ class Metadata:
 def raise_scp_error(response: requests.Response) -> None:
     """Raise SCPCloudError if appropriate. """
     status_code = response.status_code
-    if status_code == 200 or status_code == 202:
+    if status_code in {200, 202}:
         return
     try:
         resp_json = response.json()
@@ -333,15 +333,15 @@ class SCPClient:
             url = f'{url}?{parse.urlencode(enc_params)}'
 
         message = method + url + self.timestamp \
-                  + self.access_key + self.project_id + self.client_type
+                      + self.access_key + self.project_id + self.client_type
         message = bytes(message, 'utf-8')
         secret = bytes(self.secret_key, 'utf-8')
-        signature = str(
+        return str(
             base64.b64encode(
-                hmac.new(secret, message, digestmod=hashlib.sha256).digest()),
-            'utf-8')
-
-        return str(signature)
+                hmac.new(secret, message, digestmod=hashlib.sha256).digest()
+            ),
+            'utf-8',
+        )
 
     def set_timestamp(self) -> None:
         self.timestamp = str(
@@ -365,10 +365,15 @@ class SCPClient:
     def get_external_ip(self, virtual_server_id, ip):
         nic_details_list = self.list_nic_details(
             virtual_server_id=virtual_server_id)
-        for nic_details in nic_details_list:
-            if nic_details['ip'] == ip and nic_details['subnetType'] == 'PUBLIC':
-                return nic_details['natIp']
-        return None
+        return next(
+            (
+                nic_details['natIp']
+                for nic_details in nic_details_list
+                if nic_details['ip'] == ip
+                and nic_details['subnetType'] == 'PUBLIC'
+            ),
+            None,
+        )
 
     def list_zones(self) -> List[dict]:
         url = f'{API_ENDPOINT}/project/v3/projects/{self.project_id}/zones'
@@ -403,11 +408,11 @@ class SCPClient:
         url = f'{API_ENDPOINT}/security-group/v2/security-groups'
         parameter = []
         if vpc_id is not None:
-            parameter.append("vpcId=" + vpc_id)
+            parameter.append(f"vpcId={vpc_id}")
         if sg_name is not None:
-            parameter.append("securityGroupName=" + sg_name)
-        if len(parameter) > 0:
-            url = url + "?" + "&".join(parameter)
+            parameter.append(f"securityGroupName={sg_name}")
+        if parameter:
+            url = f"{url}?" + "&".join(parameter)
         return self._get(url)
 
     def list_igw(self):

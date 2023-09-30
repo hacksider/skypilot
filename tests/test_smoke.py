@@ -208,15 +208,21 @@ def get_gcp_region_for_quota_failover() -> Optional[str]:
                                                   region=None,
                                                   zone=None)
 
-    for region in candidate_regions:
-        if not GCP.check_quota_available(
-                sky.Resources(cloud=sky.GCP(),
-                              region=region.name,
-                              accelerators={'A100-80GB': 1},
-                              use_spot=True)):
-            return region.name
-
-    return None
+    return next(
+        (
+            region.name
+            for region in candidate_regions
+            if not GCP.check_quota_available(
+                sky.Resources(
+                    cloud=sky.GCP(),
+                    region=region.name,
+                    accelerators={'A100-80GB': 1},
+                    use_spot=True,
+                )
+            )
+        ),
+        None,
+    )
 
 
 # ---------- Dry run: 2 Tasks in a chain. ----------
@@ -743,12 +749,7 @@ def test_env_check(generic_cloud: str):
 @pytest.mark.no_scp  # SCP does not support num_nodes > 1 yet. Run test_scp_file_mounts instead.
 def test_file_mounts(generic_cloud: str):
     name = _get_cluster_name()
-    extra_flags = ''
-    if generic_cloud in 'kubernetes':
-        # Kubernetes does not support multi-node
-        # NOTE: This test will fail if you have a Kubernetes cluster running on
-        #  arm64 (e.g., Apple Silicon) since goofys does not work on arm64.
-        extra_flags = '--num-nodes 1'
+    extra_flags = '--num-nodes 1' if generic_cloud in 'kubernetes' else ''
     test_commands = [
         *storage_setup_commands,
         f'sky launch -y -c {name} --cloud {generic_cloud} {extra_flags} examples/using_file_mounts.yaml',
@@ -949,10 +950,7 @@ def test_ibm_storage_mounts():
 @pytest.mark.no_scp  # SCP does not support num_nodes > 1 yet. Run test_scp_logs instead.
 def test_cli_logs(generic_cloud: str):
     name = _get_cluster_name()
-    num_nodes = 2
-    if generic_cloud == 'kubernetes':
-        # Kubernetes does not support multi-node
-        num_nodes = 1
+    num_nodes = 1 if generic_cloud == 'kubernetes' else 2
     timestamp = time.time()
     test = Test(
         'cli_logs',
@@ -1454,8 +1452,10 @@ def test_gcp_http_server_with_custom_ports():
         [
             f'sky launch -y -d -c {name} --cloud gcp examples/http_server_with_custom_ports/task.yaml',
             'sleep 10',
-            'ip=$(grep -A1 "Host ' + name +
-            '" ~/.ssh/config | grep "HostName" | awk \'{print $2}\'); curl $ip:33828 | grep "<h1>This is a demo HTML page.</h1>"',
+            (
+                f'ip=$(grep -A1 "Host {name}'
+                + '" ~/.ssh/config | grep "HostName" | awk \'{print $2}\'); curl $ip:33828 | grep "<h1>This is a demo HTML page.</h1>"'
+            ),
         ],
         f'sky down -y {name}',
     )
@@ -1471,8 +1471,10 @@ def test_aws_http_server_with_custom_ports():
         [
             f'sky launch -y -d -c {name} --cloud aws examples/http_server_with_custom_ports/task.yaml',
             'sleep 10',
-            'ip=$(grep -A1 "Host ' + name +
-            '" ~/.ssh/config | grep "HostName" | awk \'{print $2}\'); curl $ip:33828 | grep "<h1>This is a demo HTML page.</h1>"',
+            (
+                f'ip=$(grep -A1 "Host {name}'
+                + '" ~/.ssh/config | grep "HostName" | awk \'{print $2}\'); curl $ip:33828 | grep "<h1>This is a demo HTML page.</h1>"'
+            ),
         ],
         f'sky down -y {name}',
     )
@@ -1488,8 +1490,10 @@ def test_azure_http_server_with_custom_ports():
         [
             f'sky launch -y -d -c {name} --cloud azure examples/http_server_with_custom_ports/task.yaml',
             'sleep 10',
-            'ip=$(grep -A1 "Host ' + name +
-            '" ~/.ssh/config | grep "HostName" | awk \'{print $2}\'); curl $ip:33828 | grep "<h1>This is a demo HTML page.</h1>"',
+            (
+                f'ip=$(grep -A1 "Host {name}'
+                + '" ~/.ssh/config | grep "HostName" | awk \'{print $2}\'); curl $ip:33828 | grep "<h1>This is a demo HTML page.</h1>"'
+            ),
         ],
         f'sky down -y {name}',
     )
@@ -1527,16 +1531,16 @@ def test_gcp_start_stop():
         'gcp-start-stop',
         [
             f'sky launch -y -c {name} examples/gcp_start_stop.yaml',
-            f'sky logs {name} 1 --status',  # Ensure the job succeeded.
+            f'sky logs {name} 1 --status',
             f'sky exec {name} examples/gcp_start_stop.yaml',
-            f'sky logs {name} 2 --status',  # Ensure the job succeeded.
-            f'sky exec {name} "prlimit -n --pid=\$(pgrep -f \'raylet/raylet --raylet_socket_name\') | grep \'"\'1048576 1048576\'"\'"',  # Ensure the raylet process has the correct file descriptor limit.
-            f'sky logs {name} 3 --status',  # Ensure the job succeeded.
+            f'sky logs {name} 2 --status',
+            f"""sky exec {name} "prlimit -n --pid=\$(pgrep -f \'raylet/raylet --raylet_socket_name\') | grep \'"\'1048576 1048576\'"\'\"""",
+            f'sky logs {name} 3 --status',
             f'sky stop -y {name}',
-            f'sleep 20',
+            'sleep 20',
             f'sky start -y {name} -i 1',
             f'sky exec {name} examples/gcp_start_stop.yaml',
-            f'sky logs {name} 4 --status',  # Ensure the job succeeded.
+            f'sky logs {name} 4 --status',
             'sleep 180',
             f'sky status -r {name} | grep "INIT\|STOPPED"',
         ],
@@ -1737,7 +1741,7 @@ def test_kubernetes_autodown():
 
 
 def _get_cancel_task_with_cloud(name, cloud, timeout=15 * 60):
-    test = Test(
+    return Test(
         f'{cloud}-cancel-task',
         [
             f'sky launch -c {name} examples/resnet_app.yaml --cloud {cloud} -y -d',
@@ -1754,7 +1758,6 @@ def _get_cancel_task_with_cloud(name, cloud, timeout=15 * 60):
         f'sky down -y {name}',
         timeout=timeout,
     )
-    return test
 
 
 # ---------- Testing `sky cancel` ----------
@@ -1821,11 +1824,11 @@ def test_cancel_ibm():
         'ibm-cancel-task',
         [
             f'sky launch -y -c {name} --cloud ibm examples/minimal.yaml',
-            f'sky exec {name} -n {name}-1 -d  "while true; do echo \'Hello SkyPilot\'; sleep 2; done"',
+            f"""sky exec {name} -n {name}-1 -d  "while true; do echo \'Hello SkyPilot\'; sleep 2; done\"""",
             'sleep 20',
             f'sky queue {name} | grep {name}-1 | grep RUNNING',
             f'sky cancel -y {name} 2',
-            f'sleep 5',
+            'sleep 5',
             f'sky queue {name} | grep {name}-1 | grep CANCELLED',
         ],
         f'sky down -y {name}',
@@ -1878,11 +1881,7 @@ def test_spot(generic_cloud: str):
             f'{_SPOT_QUEUE_WAIT}| grep {name}-1 | head -n1 | grep CANCELLED',
             f'{_SPOT_QUEUE_WAIT}| grep {name}-2 | head -n1 | grep "RUNNING\|SUCCEEDED"',
         ],
-        # TODO(zhwu): Change to _SPOT_CANCEL_WAIT.format(job_name=f'{name}-1 -n {name}-2') when
-        # canceling multiple job names is supported.
-        (_SPOT_CANCEL_WAIT.format(job_name=f'{name}-1') + '; ' +
-         _SPOT_CANCEL_WAIT.format(job_name=f'{name}-2')),
-        # Increase timeout since sky spot queue -r can be blocked by other spot tests.
+        f"{_SPOT_CANCEL_WAIT.format(job_name=f'{name}-1')}; {_SPOT_CANCEL_WAIT.format(job_name=f'{name}-2')}",
         timeout=20 * 60,
     )
     run_one_test(test)
@@ -2522,7 +2521,7 @@ def test_aws_disk_tier():
 
     for disk_tier in ['low', 'medium', 'high']:
         specs = AWS._get_disk_specs(disk_tier)
-        name = _get_cluster_name() + '-' + disk_tier
+        name = f'{_get_cluster_name()}-{disk_tier}'
         name_on_cloud = common_utils.make_cluster_name_on_cloud(
             name, sky.AWS.max_cluster_name_length())
         region = 'us-east-2'
@@ -2550,12 +2549,12 @@ def test_aws_disk_tier():
 
 @pytest.mark.gcp
 def test_gcp_disk_tier():
+    region = 'us-west2'
     for disk_tier in ['low', 'medium', 'high']:
         type = GCP._get_disk_type(disk_tier)
-        name = _get_cluster_name() + '-' + disk_tier
+        name = f'{_get_cluster_name()}-{disk_tier}'
         name_on_cloud = common_utils.make_cluster_name_on_cloud(
             name, sky.GCP.max_cluster_name_length())
-        region = 'us-west2'
         test = Test(
             'gcp-disk-tier',
             [
@@ -2575,12 +2574,12 @@ def test_gcp_disk_tier():
 
 @pytest.mark.azure
 def test_azure_disk_tier():
+    region = 'westus2'
     for disk_tier in ['low', 'medium']:
         type = Azure._get_disk_type(disk_tier)
-        name = _get_cluster_name() + '-' + disk_tier
+        name = f'{_get_cluster_name()}-{disk_tier}'
         name_on_cloud = common_utils.make_cluster_name_on_cloud(
             name, sky.Azure.max_cluster_name_length())
-        region = 'westus2'
         test = Test(
             'azure-disk-tier',
             [
@@ -2845,23 +2844,14 @@ class TestStorageWithCredentials:
     @staticmethod
     def cli_ls_cmd(store_type, bucket_name, suffix=''):
         if store_type == storage_lib.StoreType.S3:
-            if suffix:
-                url = f's3://{bucket_name}/{suffix}'
-            else:
-                url = f's3://{bucket_name}'
+            url = f's3://{bucket_name}/{suffix}' if suffix else f's3://{bucket_name}'
             return f'aws s3 ls {url}'
         if store_type == storage_lib.StoreType.GCS:
-            if suffix:
-                url = f'gs://{bucket_name}/{suffix}'
-            else:
-                url = f'gs://{bucket_name}'
+            url = f'gs://{bucket_name}/{suffix}' if suffix else f'gs://{bucket_name}'
             return f'gsutil ls {url}'
         if store_type == storage_lib.StoreType.R2:
             endpoint_url = cloudflare.create_endpoint()
-            if suffix:
-                url = f's3://{bucket_name}/{suffix}'
-            else:
-                url = f's3://{bucket_name}'
+            url = f's3://{bucket_name}/{suffix}' if suffix else f's3://{bucket_name}'
             return f'AWS_SHARED_CREDENTIALS_FILE={cloudflare.R2_CREDENTIALS_PATH} aws s3 ls {url} --endpoint {endpoint_url} --profile=r2'
         if store_type == storage_lib.StoreType.IBM:
             bucket_rclone_profile = Rclone.generate_rclone_bucket_profile_name(
@@ -2931,9 +2921,9 @@ class TestStorageWithCredentials:
                                           persistent=persistent,
                                           mode=mode)
         yield storage_obj
-        handle = global_user_state.get_handle_from_storage_name(
-            storage_obj.name)
-        if handle:
+        if handle := global_user_state.get_handle_from_storage_name(
+            storage_obj.name
+        ):
             # If handle exists, delete manually
             # TODO(romilb): This is potentially risky - if the delete method has
             #   bugs, this can cause resource leaks. Ideally we should manually
@@ -2959,9 +2949,9 @@ class TestStorageWithCredentials:
             storage_mult_obj.append(store_obj)
         yield storage_mult_obj
         for storage_obj in storage_mult_obj:
-            handle = global_user_state.get_handle_from_storage_name(
-                storage_obj.name)
-            if handle:
+            if handle := global_user_state.get_handle_from_storage_name(
+                storage_obj.name
+            ):
                 # If handle exists, delete manually
                 # TODO(romilb): This is potentially risky - if the delete method has
                 # bugs, this can cause resource leaks. Ideally we should manually
@@ -2980,7 +2970,7 @@ class TestStorageWithCredentials:
         # Creates a temp storage object which uses a list of paths as source.
         # Stores must be added in the test. After upload, the bucket should
         # have two files - /tmp-file and /tmp-source/tmp-file
-        list_source = [tmp_source, tmp_source + '/tmp-file']
+        list_source = [tmp_source, f'{tmp_source}/tmp-file']
         yield from self.yield_storage_object(name=tmp_bucket_name,
                                              source=list_source)
 
@@ -3076,9 +3066,7 @@ class TestStorageWithCredentials:
 
     @pytest.fixture
     def tmp_public_storage_obj(self, request):
-        # Initializes a storage object with a public bucket
-        storage_obj = storage_lib.Storage(source=request.param)
-        yield storage_obj
+        yield storage_lib.Storage(source=request.param)
         # This does not require any deletion logic because it is a public bucket
         # and should not get added to global_user_state.
 
@@ -3128,7 +3116,7 @@ class TestStorageWithCredentials:
             for item in out_all.decode('utf-8').splitlines()
             if store_type.value in item
         ]
-        assert all([item in out for item in storage_obj_name])
+        assert all(item in out for item in storage_obj_name)
 
         # Run sky storage delete all to delete all storage objects
         delete_cmd = ['sky', 'storage', 'delete']
@@ -3143,7 +3131,7 @@ class TestStorageWithCredentials:
             for item in out_all.decode('utf-8').splitlines()
             if store_type.value in item
         ]
-        assert all([item not in out for item in storage_obj_name])
+        assert all(item not in out for item in storage_obj_name)
 
     @pytest.mark.parametrize('store_type', [
         storage_lib.StoreType.S3, storage_lib.StoreType.GCS,
@@ -3253,12 +3241,11 @@ class TestStorageWithCredentials:
             out = out.decode('utf-8')
             if expected_output in out:
                 break
-            else:
-                retry_count += 1
-                if retry_count > 3:
-                    raise RuntimeError('Unable to find a nonexistent bucket '
-                                       'to use. This is higly unlikely - '
-                                       'check if the tests are correct.')
+            retry_count += 1
+            if retry_count > 3:
+                raise RuntimeError('Unable to find a nonexistent bucket '
+                                   'to use. This is higly unlikely - '
+                                   'check if the tests are correct.')
 
         with pytest.raises(
                 sky.exceptions.StorageBucketGetError,
@@ -3266,17 +3253,14 @@ class TestStorageWithCredentials:
             storage_obj = storage_lib.Storage(source=nonexist_bucket_url.format(
                 random_name=nonexist_bucket_name))
 
-    @pytest.mark.parametrize('private_bucket', [
-        f's3://imagenet', f'gs://imagenet',
-        pytest.param('cos://us-east/bucket1', marks=pytest.mark.ibm)
-    ])
+    @pytest.mark.parametrize('private_bucket', ['s3://imagenet', 'gs://imagenet', pytest.param('cos://us-east/bucket1', marks=pytest.mark.ibm)])
     def test_private_bucket(self, private_bucket):
         # Attempts to access private buckets not belonging to the user.
         # These buckets are known to be private, but may need to be updated if
         # they are removed by their owners.
         private_bucket_name = urllib.parse.urlsplit(private_bucket).netloc if \
-              urllib.parse.urlsplit(private_bucket).scheme != 'cos' else \
-                  urllib.parse.urlsplit(private_bucket).path.strip('/')
+                  urllib.parse.urlsplit(private_bucket).scheme != 'cos' else \
+                      urllib.parse.urlsplit(private_bucket).path.strip('/')
         with pytest.raises(
                 sky.exceptions.StorageBucketGetError,
                 match=storage_lib._BUCKET_FAIL_TO_CONNECT_MESSAGE.format(
@@ -3304,16 +3288,16 @@ class TestStorageWithCredentials:
         out = subprocess.check_output(self.cli_ls_cmd(store_type, bucket_name),
                                       shell=True)
         assert 'tmp-file' in out.decode('utf-8'), \
-            'File not found in bucket - output was : {}'.format(out.decode
+                'File not found in bucket - output was : {}'.format(out.decode
                                                                 ('utf-8'))
 
         # Check symlinks - symlinks don't get copied by sky storage
         assert (pathlib.Path(tmp_source) / 'circle-link').is_symlink(), (
             'circle-link was not found in the upload source - '
             'are the test fixtures correct?')
-        assert 'circle-link' not in out.decode('utf-8'), (
-            'Symlink found in bucket - ls output was : {}'.format(
-                out.decode('utf-8')))
+        assert 'circle-link' not in out.decode(
+            'utf-8'
+        ), f"Symlink found in bucket - ls output was : {out.decode('utf-8')}"
 
         # Run sky storage ls to check if storage object exists in the output.
         # It should not exist because the bucket was created externally.
@@ -3430,7 +3414,7 @@ class TestYamlSpecs:
         """Check if d1 is the subset of d2."""
         for k, v in d1.items():
             if k not in d2:
-                if isinstance(v, list) or isinstance(v, dict):
+                if isinstance(v, (list, dict)):
                     assert len(v) == 0, (k, v)
                 else:
                     assert False, (k, v)

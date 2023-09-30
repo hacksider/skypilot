@@ -352,12 +352,11 @@ class LocalDockerBackend(backends.Backend['LocalDockerResourceHandle']):
         }
         containers = self.client.containers.list(filters=search_filter)
         for c in containers:
-            # Extract container/image metadata
-            metadata = {}
-            for k, v in c.labels.items():
-                if k.startswith(_DOCKER_LABEL_PREFIX):
-                    # Remove 'skymeta_' from key
-                    metadata[k[len(_DOCKER_LABEL_PREFIX):]] = v
+            metadata = {
+                k[len(_DOCKER_LABEL_PREFIX) :]: v
+                for k, v in c.labels.items()
+                if k.startswith(_DOCKER_LABEL_PREFIX)
+            }
             self.images[c.name] = [c.image, metadata]
             self.containers[c.name] = c
 

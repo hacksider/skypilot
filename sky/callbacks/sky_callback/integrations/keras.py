@@ -47,10 +47,7 @@ class SkyKerasCallback(keras.callbacks.Callback):
         if not strategy.extended._in_multi_worker_mode():
             # Not in multi-worker distributed training.
             return True
-        if strategy.extended.should_checkpoint:
-            # Chief worker.
-            return True
-        return False
+        return bool(strategy.extended.should_checkpoint)
 
     def _infer_total_steps(self) -> Optional[int]:
         if self._total_steps is not None:
@@ -58,11 +55,7 @@ class SkyKerasCallback(keras.callbacks.Callback):
 
         epochs = self.params['epochs']
         steps_per_epoch = self.params['steps']
-        if steps_per_epoch is None:
-            total_steps = None
-        else:
-            total_steps = epochs * steps_per_epoch
-        return total_steps
+        return None if steps_per_epoch is None else epochs * steps_per_epoch
 
     def on_train_begin(self, logs: Dict = None) -> None:
         del logs  # Unused.

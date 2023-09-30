@@ -96,8 +96,9 @@ class IBM(clouds.Cloud):
         """
         # del accelerators  # unused
         del num_nodes  # unused
-        assert use_spot is False, (
-            'current IBM implementation doesn\'t support spot instances')
+        assert (
+            not use_spot
+        ), 'current IBM implementation doesn\'t support spot instances'
 
         regions = cls.regions_with_offering(instance_type,
                                             accelerators,
@@ -492,8 +493,8 @@ class IBM(clouds.Cloud):
 def get_cred_file_field(field, default_val=None) -> str:
     """returns a the value of a field from the user's
      credentials file if exists, else default_val"""
-    base_config = ibm.read_credential_file()
-    if not base_config:
+    if base_config := ibm.read_credential_file():
+        return base_config.get(field, default_val)
+    else:
         raise FileNotFoundError('Missing '
                                 f'credential file at {CREDENTIAL_FILE}')
-    return base_config.get(field, default_val)
